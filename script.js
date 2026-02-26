@@ -981,7 +981,7 @@ function initGame() {
         const totalGaps = gap * (GRID_SIZE - 1);
         const available = Math.max(200, innerWidth - totalGaps);
         const raw = Math.floor(available / GRID_SIZE);
-        const clamped = Math.max(38, Math.min(64, raw));
+        const clamped = Math.max(32, Math.min(64, raw));
         document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
     }
     updateTileSize();
