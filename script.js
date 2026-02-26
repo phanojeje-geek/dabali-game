@@ -490,6 +490,59 @@ const ambientSoundManager = {
             osc1.start();
             osc2.start();
             ambientOscillators.push(osc1, osc2);
+        } else if (theme === 'treichville') {
+            // Party/Street vibe (Beat)
+            const osc = soundCtx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.value = 80;
+            
+            const gain = soundCtx.createGain();
+            gain.gain.value = 0.05;
+            
+            // Low pass filter for muffled club sound
+            const filter = soundCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 150;
+            
+            // LFO for beat pulsing
+            const lfo = soundCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 2; // 120 BPM approx
+            
+            const lfoGain = soundCtx.createGain();
+            lfoGain.gain.value = 50;
+            
+            osc.connect(filter);
+            lfo.connect(lfoGain);
+            lfoGain.connect(filter.frequency);
+            filter.connect(gain);
+            gain.connect(ambientGain);
+            
+            osc.start();
+            lfo.start();
+            ambientOscillators.push(osc, lfo);
+        } else if (theme === 'marche') {
+            // Busy Market (Crowd noise + high pitched chatter)
+            const bufferSize = soundCtx.sampleRate * 2;
+            const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.5;
+            }
+            const noise = soundCtx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            
+            // Bandpass to focus on "speech" frequencies
+            const filter = soundCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1000;
+            filter.Q.value = 1;
+            
+            noise.connect(filter);
+            filter.connect(ambientGain);
+            noise.start();
+            ambientOscillators.push(noise);
         }
     }
 };
@@ -519,8 +572,8 @@ const ambientManager = {
         if(!layer) return;
         layer.innerHTML = ''; // Clear
 
-        if (theme === 'garba' || theme === 'treichville' || theme === 'marche') {
-            // Nature/Wood theme shared
+        if (theme === 'garba') {
+            // Nature/Wood theme
             const leftPillar = document.createElement('div');
             leftPillar.className = 'ambient-element wood-pillar left';
             layer.appendChild(leftPillar);
@@ -560,6 +613,39 @@ const ambientManager = {
                 light.style.top = (Math.random() * 40 + 10) + 'px';
                 light.style.animationDelay = Math.random() * 3 + 's';
                 layer.appendChild(light);
+            }
+        } else if (theme === 'treichville') {
+            // Street/Party theme
+            const s1 = document.createElement('div');
+            s1.className = 'treichville-speaker left';
+            s1.innerHTML = '<div class="speaker-tweeter"></div><div class="speaker-cone"></div>';
+            layer.appendChild(s1);
+            
+            const s2 = document.createElement('div');
+            s2.className = 'treichville-speaker right';
+            s2.innerHTML = '<div class="speaker-tweeter"></div><div class="speaker-cone"></div>';
+            layer.appendChild(s2);
+        } else if (theme === 'marche') {
+            // Market theme
+            const u1 = document.createElement('div');
+            u1.className = 'market-umbrella u1';
+            layer.appendChild(u1);
+            
+            const u2 = document.createElement('div');
+            u2.className = 'market-umbrella u2';
+            layer.appendChild(u2);
+            
+            // Floating fruits
+            const fruits = ['🍌', '🍍', '🥭', '🌶️'];
+            for(let i=0; i<5; i++) {
+                const f = document.createElement('div');
+                f.className = 'market-fruit';
+                f.innerText = fruits[Math.floor(Math.random() * fruits.length)];
+                f.style.left = (Math.random() * 90 + 5) + '%';
+                f.style.top = (Math.random() * 60 + 20) + '%';
+                f.style.animationDelay = Math.random() * 2 + 's';
+                f.style.fontSize = (Math.random() * 20 + 20) + 'px';
+                layer.appendChild(f);
             }
         }
     }
