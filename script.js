@@ -27,7 +27,8 @@ const STORAGE_KEYS = {
     bestScores: 'dabali_best_scores',
     bestStars: 'dabali_best_stars',
     freeSuperCombos: 'dabali_free_super_combos',
-    gameState: 'dabali_game_state_v1' // New key for game state persistence
+    gameState: 'dabali_game_state_v1',
+    music: 'dabali_music'
 };
 
 // ... (Existing code)
@@ -365,6 +366,8 @@ function applyThemeForLevel(levelId) {
     else if (levelId <= 40) document.body.classList.add('theme-cocody');
     else if (levelId <= 60) document.body.classList.add('theme-treichville');
     else document.body.classList.add('theme-marche');
+    
+    if (typeof ambientManager !== 'undefined') ambientManager.update(levelId);
 }
 
 // STATE
@@ -391,6 +394,176 @@ let timeRemaining = 90; // 1m30s
 let isPaused = false;
 let hintTimeout = null;
 let currentHint = null;
+
+// AMBIENT SOUND SYSTEM
+let ambientOscillators = [];
+let ambientGain = null;
+let isMusicOn = true;
+
+const ambientSoundManager = {
+    stop: () => {
+        ambientOscillators.forEach(osc => {
+            try { osc.stop(); } catch(e){}
+        });
+        ambientOscillators = [];
+        if (ambientGain) {
+            try { ambientGain.disconnect(); } catch(e){}
+            ambientGain = null;
+        }
+    },
+    
+    play: (theme) => {
+        if (!isMusicOn) return;
+        ambientSoundManager.stop();
+        
+        if (soundCtx.state === 'suspended') soundCtx.resume();
+        
+        ambientGain = soundCtx.createGain();
+        ambientGain.gain.value = 0.05; // Very low volume background
+        ambientGain.connect(soundCtx.destination);
+
+        if (theme === 'garba') {
+            // Nature/Wind (Pink noise approx)
+            const bufferSize = soundCtx.sampleRate * 2;
+            const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                data[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = data[i];
+                data[i] *= 3.5; 
+            }
+            let lastOut = 0;
+            
+            const noise = soundCtx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            noise.connect(ambientGain);
+            noise.start();
+            ambientOscillators.push(noise);
+        } else if (theme === 'yopougon') {
+            // Water/Waves (Low frequency noise)
+            const osc = soundCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = 0.5; // LFO
+            
+            const gain = soundCtx.createGain();
+            gain.gain.value = 0.1;
+            
+            // Create noise
+            const bufferSize = soundCtx.sampleRate * 2;
+            const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = soundCtx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            
+            // Filter noise
+            const filter = soundCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ambientGain);
+            
+            // Modulate filter freq with LFO
+            osc.connect(filter.frequency);
+            
+            noise.start();
+            osc.start();
+            ambientOscillators.push(noise, osc);
+        } else if (theme === 'cocody') {
+            // City drone
+            const osc1 = soundCtx.createOscillator();
+            osc1.type = 'triangle';
+            osc1.frequency.value = 50;
+            const osc2 = soundCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.value = 52; // Beat freq
+            
+            osc1.connect(ambientGain);
+            osc2.connect(ambientGain);
+            osc1.start();
+            osc2.start();
+            ambientOscillators.push(osc1, osc2);
+        }
+    }
+};
+
+// AMBIENT VISUAL MANAGER
+const ambientManager = {
+    currentTheme: null,
+    
+    update: (levelId) => {
+        let theme = 'garba';
+        if (levelId <= 10) theme = 'garba';
+        else if (levelId <= 20) theme = 'yopougon';
+        else if (levelId <= 40) theme = 'cocody';
+        else if (levelId <= 60) theme = 'treichville';
+        else theme = 'marche';
+
+        // Always update visual if theme changed OR first load
+        if (ambientManager.currentTheme !== theme) {
+            ambientManager.currentTheme = theme;
+            ambientManager.render(theme);
+            ambientSoundManager.play(theme);
+        }
+    },
+
+    render: (theme) => {
+        const layer = document.getElementById('ambient-layer');
+        if(!layer) return;
+        layer.innerHTML = ''; // Clear
+
+        if (theme === 'garba' || theme === 'treichville' || theme === 'marche') {
+            // Nature/Wood theme shared
+            const leftPillar = document.createElement('div');
+            leftPillar.className = 'ambient-element wood-pillar left';
+            layer.appendChild(leftPillar);
+            
+            const rightPillar = document.createElement('div');
+            rightPillar.className = 'ambient-element wood-pillar right';
+            layer.appendChild(rightPillar);
+
+            const leaves = document.createElement('div');
+            leaves.className = 'ambient-element leaves-top';
+            layer.appendChild(leaves);
+        } else if (theme === 'yopougon') {
+            // Water theme
+            const overlay = document.createElement('div');
+            overlay.className = 'ambient-element water-overlay';
+            
+            const wave1 = document.createElement('div');
+            wave1.className = 'wave';
+            overlay.appendChild(wave1);
+            
+            const wave2 = document.createElement('div');
+            wave2.className = 'wave';
+            overlay.appendChild(wave2);
+            
+            layer.appendChild(overlay);
+        } else if (theme === 'cocody') {
+            // City theme
+            const skyline = document.createElement('div');
+            skyline.className = 'ambient-element city-skyline';
+            layer.appendChild(skyline);
+            
+            // Twinkling lights
+            for(let i=0; i<8; i++) {
+                const light = document.createElement('div');
+                light.className = 'city-light';
+                light.style.left = Math.random() * 100 + '%';
+                light.style.top = (Math.random() * 40 + 10) + 'px';
+                light.style.animationDelay = Math.random() * 3 + 's';
+                layer.appendChild(light);
+            }
+        }
+    }
+};
 
 // SOUND SYSTEM
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -655,6 +828,7 @@ const openLevelMapBtn = document.getElementById('open-level-map');
 const promoCodeBtn = document.getElementById('promo-code-btn');
 const darkModeToggle = document.getElementById('dark-mode-toggle');
 const soundToggle = document.getElementById('sound-toggle');
+const musicToggle = document.getElementById('music-toggle');
 const vibrationToggle = document.getElementById('vibration-toggle');
 // Splash
 const splashScreen = document.getElementById('splash-screen');
@@ -816,6 +990,26 @@ function initGame() {
         soundToggle.addEventListener('change', () => {
             isSoundOn = soundToggle.checked;
             localStorage.setItem(STORAGE_KEYS.sound, isSoundOn ? 'on' : 'off');
+        });
+    }
+
+    if (musicToggle) {
+        const savedMusic = localStorage.getItem(STORAGE_KEYS.music);
+        if (savedMusic) {
+            isMusicOn = savedMusic === 'on';
+        } else {
+            isMusicOn = true;
+        }
+        musicToggle.checked = isMusicOn;
+        
+        musicToggle.addEventListener('change', () => {
+            isMusicOn = musicToggle.checked;
+            localStorage.setItem(STORAGE_KEYS.music, isMusicOn ? 'on' : 'off');
+            if (isMusicOn) {
+                ambientSoundManager.play(ambientManager.currentTheme);
+            } else {
+                ambientSoundManager.stop();
+            }
         });
     }
 
@@ -1751,6 +1945,11 @@ function showBonDabali() {
     vibrate([80, 40, 80]);
     spawnComboStars();
     setAvatarMood('happy');
+    if (avatarEl) {
+        avatarEl.classList.remove('jump-anim');
+        void avatarEl.offsetWidth; // Trigger reflow
+        avatarEl.classList.add('jump-anim');
+    }
     setTimeout(() => comboMsg.classList.add('hidden'), 400);
     score += 300;
 }

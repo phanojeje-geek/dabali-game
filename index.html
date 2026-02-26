@@ -33,9 +33,16 @@
         </div>
         <div class="drawer-content">
             <div class="drawer-item">
-                <span>Son</span>
+                <span>Son (Bruitages)</span>
                 <label class="switch">
                     <input type="checkbox" id="sound-toggle" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="drawer-item">
+                <span>Musique / Ambiance</span>
+                <label class="switch">
+                    <input type="checkbox" id="music-toggle" checked>
                     <span class="slider round"></span>
                 </label>
             </div>
@@ -77,6 +84,9 @@
     </div>
 
     <div id="game-container">
+        <!-- New Ambient Layer -->
+        <div id="ambient-layer"></div>
+        
         <div id="header">
             <div class="header-top">
                 <button id="menu-btn"><i class="fas fa-bars"></i></button>
@@ -194,7 +204,7 @@
         <button id="update-btn">Mettre à jour</button>
     </div>
 
-    <script src="script.js?v=6"></script>
+    <script src="script.js?v=7"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
