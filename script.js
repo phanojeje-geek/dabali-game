@@ -973,6 +973,7 @@ const progress = document.querySelector('.progress');
 
 // INIT
 function initGame() {
+    console.log("Dabali Game v1.10 Loaded");
     // Responsive tile sizing
     function updateTileSize() {
         if (!gameBoardEl) return;
