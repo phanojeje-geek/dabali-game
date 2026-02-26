@@ -232,6 +232,7 @@ body.theme-marche #game-board {
     justify-content: center;
     align-items: center;
     padding: 10px;
+    perspective: 800px; /* Add depth perspective */
 }
 
 /* LANDSCAPE ADAPTATION (mobile, tablette, PC) */
@@ -255,6 +256,8 @@ body.theme-marche #game-board {
     gap: 4px;
     width: 100%;
     height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .tile {
@@ -268,8 +271,8 @@ body.theme-marche #game-board {
     font-size: clamp(1rem, 5vw, 2rem); /* Responsive emoji size */
     cursor: pointer;
     box-shadow:
-        0 4px 0 rgba(120, 70, 30, 0.6),
-        0 6px 8px rgba(0,0,0,0.3);
+        0 6px 0 rgba(120, 70, 30, 0.6), /* Deeper shadow for 3D feel */
+        0 8px 10px rgba(0,0,0,0.3);
     position: relative; /* Pour les anims */
     z-index: 10;
     transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, top 0.2s, left 0.2s;
@@ -281,12 +284,12 @@ body.theme-marche #game-board {
         0 0 10px #FFD700,
         0 4px 0 rgba(120, 70, 30, 0.7),
         0 8px 10px rgba(0,0,0,0.4);
-    transform: translateY(-2px) scale(1.05);
+    transform: translateY(-2px) scale(1.05) translateZ(10px);
     z-index: 20;
 }
 
 .tile:active {
-    transform: translateY(2px) scale(0.98);
+    transform: translateY(4px) scale(0.95);
     box-shadow:
         0 2px 0 rgba(120, 70, 30, 0.6),
         0 3px 6px rgba(0,0,0,0.3);
@@ -299,8 +302,8 @@ body.theme-marche #game-board {
 .tile-poisson {
     background: linear-gradient(145deg, #4fc3f7, #0288d1);
     box-shadow:
-        0 4px 0 rgba(1, 87, 155, 0.9),
-        0 6px 10px rgba(0,0,0,0.4);
+        0 6px 0 rgba(1, 87, 155, 0.9),
+        0 8px 12px rgba(0,0,0,0.4);
 }
 
 .tile-piment {
@@ -882,19 +885,111 @@ body.dark-mode .goal-item.completed { background: #2E8B57; border-color: #2E8B57
     border: 2px solid #8B4513;
     background: #FFD700;
     color: #8B4513;
+}
+
+/* NEW ADDITIONS FOR ROBUSTNESS & JUICINESS */
+
+/* Screen Shake Animation */
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.shake-anim {
+    animation: shake 0.5s;
+}
+
+/* Floating Text (Score Popup) */
+.floating-text {
+    position: absolute;
+    color: #FFD700;
+    font-weight: 900;
+    font-size: 1.8rem;
+    text-shadow: 2px 2px 0 #000, 0 0 10px rgba(255,215,0,0.5);
+    pointer-events: none;
+    z-index: 2000;
+    animation: floatUp 1s ease-out forwards;
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    50% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+    100% { transform: translateY(-60px) scale(0.8); opacity: 0; }
+}
+
+/* Update Toast Notification */
+#update-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(150px);
+    background: rgba(30, 30, 30, 0.95);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 30px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 9999;
+    font-size: 0.9rem;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.2);
+    width: 90%;
+    max-width: 400px;
+    justify-content: space-between;
+}
+
+#update-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+#update-btn {
+    background: #FFD700;
+    color: #8B4513;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
     font-weight: bold;
     cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 
-.level-button.locked {
-    background: #ccc;
-    color: #777;
-    border-color: #999;
-    cursor: default;
+#update-btn:active {
+    transform: scale(0.95);
 }
 
-.level-button.current {
-    background: #28a745;
-    color: white;
-    border-color: #1e7e34;
+/* 3D Depth Enhancements */
+/* Note: Perspective is applied to #grid-container and transform-style to #grid above */
+
+.particle {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2500;
+    animation: particleAnim 0.6s ease-out forwards;
+}
+
+@keyframes particleAnim {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0);
+        opacity: 0;
+    }
 }

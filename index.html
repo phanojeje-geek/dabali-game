@@ -188,26 +188,41 @@
         </div>
     </div>
 
+    <!-- Update Toast -->
+    <div id="update-toast">
+        <span>Une nouvelle version est disponible ! 🚀</span>
+        <button id="update-btn">Mettre à jour</button>
+    </div>
+
     <script src="script.js?v=6"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => {
-                    console.log('SW enregistré');
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    console.log('SW registered:', reg);
+                    
                     reg.onupdatefound = () => {
                         const installingWorker = reg.installing;
-                        if (!installingWorker) return;
                         installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                const shouldReload = confirm('Une nouvelle version de DABALI est disponible. Mettre à jour maintenant ?');
-                                if (shouldReload) {
-                                    window.location.reload();
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    // Show custom toast instead of alert
+                                    const toast = document.getElementById('update-toast');
+                                    const btn = document.getElementById('update-btn');
+                                    if (toast && btn) {
+                                        toast.classList.add('show');
+                                        btn.onclick = () => {
+                                            // Send skipWaiting to the new service worker
+                                            installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                                            window.location.reload();
+                                        };
+                                    }
                                 }
                             }
                         };
                     };
-                })
-                .catch(err => console.log('Erreur SW', err));
+                }).catch(err => console.log('SW reg failed:', err));
+            });
         }
     </script>
 </body>

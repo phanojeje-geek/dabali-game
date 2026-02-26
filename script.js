@@ -26,8 +26,197 @@ const STORAGE_KEYS = {
     maxUnlockedLevel: 'dabali_max_unlocked_level',
     bestScores: 'dabali_best_scores',
     bestStars: 'dabali_best_stars',
-    freeSuperCombos: 'dabali_free_super_combos'
+    freeSuperCombos: 'dabali_free_super_combos',
+    gameState: 'dabali_game_state_v1' // New key for game state persistence
 };
+
+// ... (Existing code)
+
+// PERSISTENCE & JUICY EFFECTS
+
+function saveGameState() {
+    if (moves <= 0 || timeRemaining <= 0) {
+        localStorage.removeItem(STORAGE_KEYS.gameState);
+        return;
+    }
+
+    const gridState = grid.map(row => row.map(tile => ({
+        type: tile.type.id,
+        isObstacle: isObstacleId(tile.type.id)
+    })));
+
+    const state = {
+        level,
+        score,
+        moves,
+        timeRemaining,
+        currentGoals,
+        goalProgress,
+        gridState
+    };
+
+    localStorage.setItem(STORAGE_KEYS.gameState, JSON.stringify(state));
+}
+
+function loadGameState() {
+    const raw = localStorage.getItem(STORAGE_KEYS.gameState);
+    if (!raw) return false;
+
+    try {
+        const state = JSON.parse(raw);
+        if (state.level !== level) return false; // Basic validation
+
+        score = state.score;
+        moves = state.moves;
+        timeRemaining = state.timeRemaining;
+        currentGoals = state.currentGoals;
+        goalProgress = state.goalProgress;
+        
+        // Restore Grid
+        gridEl.innerHTML = '';
+        grid = [];
+        for (let r = 0; r < GRID_SIZE; r++) {
+            let row = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const tileData = state.gridState[r][c];
+                let type;
+                
+                if (tileData.isObstacle) {
+                     // Find obstacle def
+                     for(let k in OBSTACLES) {
+                         if(OBSTACLES[k].id === tileData.type) type = OBSTACLES[k];
+                     }
+                } else {
+                     type = INGREDIENTS.find(i => i.id === tileData.type);
+                }
+                
+                if (!type) type = INGREDIENTS[0]; // Fallback
+
+                const el = document.createElement('div');
+                el.className = 'tile';
+                renderTileContent(el, type);
+                el.dataset.r = r;
+                el.dataset.c = c;
+                
+                // Re-attach events
+                el.addEventListener('mousedown', handleInputStart);
+                el.addEventListener('touchstart', handleInputStart, {passive: false});
+
+                if (tileData.isObstacle) el.classList.add('obstacle');
+
+                row.push({ r, c, type, el });
+                gridEl.appendChild(el);
+            }
+            grid.push(row);
+        }
+        
+        updateUI();
+        renderGoals();
+        updateTimerUI();
+        startTimer(); // Resume timer
+        return true;
+    } catch (e) {
+        console.error("Failed to load game state", e);
+        return false;
+    }
+}
+
+function clearSavedGame() {
+    localStorage.removeItem(STORAGE_KEYS.gameState);
+}
+
+// JUICY EFFECTS
+
+function triggerShake() {
+    document.body.classList.remove('shake-anim');
+    void document.body.offsetWidth; // Trigger reflow
+    document.body.classList.add('shake-anim');
+    if (navigator.vibrate) navigator.vibrate(200);
+}
+
+function showFloatingText(x, y, text, color = '#FFD700') {
+    const el = document.createElement('div');
+    el.className = 'floating-text';
+    el.innerText = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color;
+    document.body.appendChild(el);
+    
+    setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    }, 1000);
+}
+
+function showWouhEffect() {
+    const el = document.createElement('div');
+    el.innerText = "WOUH !";
+    el.style.position = 'fixed';
+    el.style.top = '50%';
+    el.style.left = '50%';
+    el.style.transform = 'translate(-50%, -50%) scale(0)';
+    el.style.fontSize = '4rem';
+    el.style.fontWeight = 'bold';
+    el.style.color = '#fff';
+    el.style.textShadow = '0 0 20px #FF4500';
+    el.style.zIndex = '3000';
+    el.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    
+    document.body.appendChild(el);
+    
+    requestAnimationFrame(() => {
+        el.style.transform = 'translate(-50%, -50%) scale(1.5)';
+    });
+    
+    setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        }, 300);
+    }, 800);
+    
+    triggerShake();
+    soundManager.playBonDabali();
+}
+
+function getParticleColor(typeId) {
+    switch(typeId) {
+        case 'attieke': return '#F5F5DC';
+        case 'poisson': return '#87CEEB';
+        case 'piment': return '#FF4500';
+        case 'oignon': return '#DDA0DD';
+        case 'tomate': return '#FF6347';
+        case 'maggi': return '#FFD700';
+        case 'huile': return '#FFA500';
+        case 'crate': return '#8B4513';
+        case 'frozen': return '#E0FFFF';
+        case 'rock': return '#696969';
+        case 'fire': return '#FF4500';
+        default: return '#FFFFFF';
+    }
+}
+
+function spawnMatchParticles(x, y, color) {
+    const count = 12;
+    for(let i=0; i<count; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.backgroundColor = color;
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 60 + 20;
+        
+        p.style.setProperty('--tx', Math.cos(angle) * velocity + 'px');
+        p.style.setProperty('--ty', Math.sin(angle) * velocity + 'px');
+        
+        document.body.appendChild(p);
+        
+        setTimeout(() => p.remove(), 600);
+    }
+}
+
 
 const LEVELS = [
     { id: 1, moves: 20, goals: { attieke: 10, poisson: 10 } },
@@ -191,6 +380,7 @@ let playerName = "Joueur";
 let isSoundOn = true;
 let isVibrationOn = true;
 let freeSuperCombos = 0;
+let comboCount = 0;
 
 let timerInterval = null;
 let avatarEl = null;
@@ -538,16 +728,62 @@ function initGame() {
                 }, 300);
             }
             soundManager.playWin(); // Welcome sound
-            const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
-            const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
-            level = initialLevel;
-            const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
-            const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
-            if (maxUnlocked <= 1 && level === 1 && tutorialOverlay) {
-                tutorialOverlay.classList.remove('hidden');
-                tutorialOverlay.classList.add('active');
-            } else {
-                openLevelSelect();
+            
+            // Check for saved game state first
+            const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
+            let resumed = false;
+            if (savedStateRaw) {
+                try {
+                    const state = JSON.parse(savedStateRaw);
+                    if (state.level && state.moves > 0 && state.timeRemaining > 0) {
+                         // Show Resume Modal
+                         const resumeOverlay = document.createElement('div');
+                         resumeOverlay.className = 'modal-overlay active';
+                         resumeOverlay.style.zIndex = '3000';
+                         resumeOverlay.innerHTML = `
+                            <div class="modal-content" style="background: rgba(20,20,20,0.95); border: 2px solid #FFD700;">
+                                <h2 style="color:#FFD700; font-size:1.8rem;">Partie en cours</h2>
+                                <p style="margin:20px 0; font-size:1.1rem;">Une partie sauvegardée a été trouvée (Niveau ${state.level}).</p>
+                                <p style="margin-bottom:20px;">Score: ${state.score}</p>
+                                <div class="modal-buttons" style="display:flex; gap:15px; justify-content:center;">
+                                    <button id="resume-yes-btn" class="modal-btn" style="background:#4CAF50; border:none;">Reprendre</button>
+                                    <button id="resume-no-btn" class="modal-btn" style="background:#f44336; border:none;">Nouvelle Partie</button>
+                                </div>
+                            </div>
+                         `;
+                         document.body.appendChild(resumeOverlay);
+                         
+                         document.getElementById('resume-yes-btn').onclick = () => {
+                             resumeOverlay.remove();
+                             level = state.level;
+                             startLevel(level, true);
+                         };
+                         
+                         document.getElementById('resume-no-btn').onclick = () => {
+                             resumeOverlay.remove();
+                             clearSavedGame();
+                             openLevelSelect();
+                         };
+                         resumed = true; // Handled by modal logic
+                    }
+                } catch(e) {
+                    console.error("Error checking saved state", e);
+                }
+            }
+
+            if (!resumed) {
+                const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
+                const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
+                level = initialLevel;
+                const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
+                const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
+                
+                if (maxUnlocked <= 1 && level === 1 && tutorialOverlay) {
+                    tutorialOverlay.classList.remove('hidden');
+                    tutorialOverlay.classList.add('active');
+                } else {
+                    openLevelSelect();
+                }
             }
         });
     }
@@ -725,13 +961,23 @@ function togglePause() {
         overlay.innerHTML = `
             <div>PAUSE</div>
             <div style="font-size:1rem; margin:20px 0">Touche le bouton Play pour reprendre</div>
-            <button id="resume-btn" class="modal-btn" style="background:#FFD700; color:#8B4513; margin-top:20px;">
-                <i class="fas fa-play"></i> Reprendre
-            </button>
+            <div style="display:flex; flex-direction:column; gap:15px; align-items:center;">
+                <button id="resume-btn" class="modal-btn" style="background:#FFD700; color:#8B4513; margin:0;">
+                    <i class="fas fa-play"></i> Reprendre
+                </button>
+                <button id="menu-btn-pause" class="modal-btn" style="background:#FF4500; color:white; font-size:1rem; padding:8px 20px; margin:0;">
+                    <i class="fas fa-home"></i> Menu Principal
+                </button>
+            </div>
         `;
         document.body.appendChild(overlay);
 
         document.getElementById('resume-btn').addEventListener('click', togglePause);
+        document.getElementById('menu-btn-pause').addEventListener('click', () => {
+            if (confirm("Retourner au menu ? La partie sera sauvegardée.")) {
+                 window.location.reload();
+            }
+        });
     } else {
         startTimer();
         isProcessing = false;
@@ -748,7 +994,17 @@ function quitGame() {
     }
 }
 
-function startLevel(lvl) {
+function startLevel(lvl, resume = false) {
+    if (resume && loadGameState()) {
+        applyThemeForLevel(level);
+        modalOverlay.classList.add('hidden');
+        // Resume timer
+        startTimer();
+        return;
+    }
+
+    clearSavedGame();
+
     // Loop back to level 1 if max reached (or handle end game)
     const levelConfig = LEVELS.find(l => l.id === lvl) || LEVELS[0]; 
     level = levelConfig.id;
@@ -777,6 +1033,8 @@ function startLevel(lvl) {
     // Create Grid
     createGrid(levelConfig.obstacles ? levelConfig.obstacles.count : 0);
     resetHintTimer();
+    
+    saveGameState(); // Initial save
 }
 
 function startTimer() {
@@ -1248,6 +1506,7 @@ function triggerSuperCombo() {
     timeRemaining += 30;
     updateTimerUI();
     vibrate([100, 50, 100, 50, 200]);
+    showWouhEffect(); // Juicy WOUH effect
     
     // Force restart timer if not paused to ensure it continues
     if (!isPaused) {
@@ -1485,10 +1744,22 @@ async function processMatches(matches) {
         t.el.classList.add('match-anim');
         if (!typeCounts[t.type.id]) typeCounts[t.type.id] = 0;
         typeCounts[t.type.id]++;
+        
+        // Particle effect
+        const rect = t.el.getBoundingClientRect();
+        const color = getParticleColor(t.type.id);
+        spawnMatchParticles(rect.left + rect.width/2, rect.top + rect.height/2, color);
     });
 
     soundManager.playMatch();
     setAvatarMood('angry');
+
+    if (comboCount > 1) {
+        const bonus = comboCount * 50;
+        score += bonus;
+        showFloatingText(window.innerWidth / 2, window.innerHeight / 2 - 50, `+${bonus}`, '#FFD700');
+        vibrate([30, 30]);
+    }
 
     let goalCompletedThisTurn = false;
     let allGoalsCompleted = false;
@@ -1572,9 +1843,12 @@ async function processMatches(matches) {
             // Simplified: If it's in the top 'addedCount' rows, it's a spawn/drop.
             
             grid[r][c].type = newColTypes[r];
+            
+            // Reset classes first, then render
+            grid[r][c].el.className = 'tile'; 
             renderTileContent(grid[r][c].el, grid[r][c].type);
-            grid[r][c].el.className = 'tile'; // Reset classes (remove match-anim, obstacle)
-            if (grid[r][c].type.id === 'crate') grid[r][c].el.classList.add('obstacle');
+            
+            if (isObstacleId(grid[r][c].type.id)) grid[r][c].el.classList.add('obstacle');
             
             // Add drop animation if it was updated
             if (r < addedCount) {
@@ -1594,11 +1868,48 @@ async function processMatches(matches) {
 async function resolveMatchesLoop() {
     const newMatches = findMatches();
     if (newMatches.length > 0) {
+        comboCount++;
+        if (comboCount > 1) {
+            showComboText(comboCount);
+        }
         await processMatches(newMatches);
     } else {
         isProcessing = false;
+        comboCount = 0;
         checkGameEnd();
+        saveGameState();
     }
+}
+
+function showComboText(count) {
+    const el = document.createElement('div');
+    el.innerText = `COMBO x${count} !`;
+    el.style.position = 'fixed';
+    el.style.left = '50%';
+    el.style.top = '40%';
+    el.style.transform = 'translate(-50%, -50%) scale(0) rotate(-10deg)';
+    el.style.color = '#FFD700';
+    el.style.fontSize = '3.5rem';
+    el.style.fontWeight = 'bold';
+    el.style.textShadow = '0 0 15px #FF4500, 4px 4px 0 #8B4513';
+    el.style.zIndex = '2000';
+    el.style.pointerEvents = 'none';
+    el.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-in';
+    
+    document.body.appendChild(el);
+    
+    requestAnimationFrame(() => {
+        el.style.transform = 'translate(-50%, -50%) scale(1) rotate(0deg)';
+    });
+    
+    setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translate(-50%, -50%) scale(1.5) rotate(10deg)';
+        setTimeout(() => el.remove(), 300);
+    }, 800);
+    
+    vibrate([50, 50, 50]);
+    soundManager.playMatch(); 
 }
 
 function checkGameEnd() {

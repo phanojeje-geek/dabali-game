@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dabali-v7';
+const CACHE_NAME = 'dabali-v8';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -11,7 +11,7 @@ const ASSETS_TO_CACHE = [
 
 // Installation
 self.addEventListener('install', (event) => {
-    self.skipWaiting(); // Force activation immediately
+    // Ne pas forcer l'activation immédiate pour permettre à l'utilisateur de choisir via la notif
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
@@ -34,6 +34,13 @@ self.addEventListener('activate', (event) => {
             );
         }).then(() => self.clients.claim()) // Take control of all clients immediately
     );
+});
+
+// Écouteur pour le message SKIP_WAITING envoyé depuis le client
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 // Fetch (servir le cache ou le réseau)
