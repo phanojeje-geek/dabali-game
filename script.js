@@ -973,16 +973,26 @@ const progress = document.querySelector('.progress');
 
 // INIT
 function initGame() {
-    console.log("Dabali Game v1.10 Loaded");
+    console.log("Dabali Game v1.11 - Init Started");
+    try {
+        if (!document.getElementById('grid')) {
+            console.error("FATAL: #grid element not found in DOM!");
+        } else {
+            console.log("#grid element found.");
+        }
     // Responsive tile sizing
     function updateTileSize() {
-        if (!gameBoardEl) return;
+        if (!gameBoardEl) {
+            console.warn("gameBoardEl not found for updateTileSize");
+            return;
+        }
         const gap = 4; // must match CSS #grid gap
-        const innerWidth = gameBoardEl.clientWidth - 10; // account for board padding/border visually
+        const innerWidth = gameBoardEl.clientWidth || 320; // Fallback width if not rendered yet
         const totalGaps = gap * (GRID_SIZE - 1);
         const available = Math.max(200, innerWidth - totalGaps);
         const raw = Math.floor(available / GRID_SIZE);
         const clamped = Math.max(32, Math.min(64, raw));
+        console.log("Updated Tile Size to:", clamped, "px (from width:", innerWidth, ")");
         document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
     }
     updateTileSize();
@@ -1253,6 +1263,9 @@ function initGame() {
             openLevelSelect();
         });
     }
+    } catch (e) {
+        console.error("FATAL ERROR in initGame:", e);
+    }
 }
 
 function openLevelSelect() {
@@ -1356,7 +1369,9 @@ function quitGame() {
 }
 
 function startLevel(lvl, resume = false) {
-    if (resume && loadGameState()) {
+    console.log(`Starting Level: ${lvl}, Resume: ${resume}`);
+    try {
+        if (resume && loadGameState()) {
         applyThemeForLevel(level);
         modalOverlay.classList.add('hidden');
         // Resume timer
@@ -1396,6 +1411,10 @@ function startLevel(lvl, resume = false) {
     resetHintTimer();
     
     saveGameState(); // Initial save
+    } catch (e) {
+        console.error("FATAL ERROR in startLevel:", e);
+        alert("Une erreur est survenue lors du démarrage du niveau. Voir la console.");
+    }
 }
 
 function startTimer() {
@@ -1614,6 +1633,11 @@ function reshuffleGrid() {
 }
 
 function createGrid(obstacleCount = 0) {
+    console.log(`createGrid: obstacleCount=${obstacleCount}, GRID_SIZE=${GRID_SIZE}`);
+    if (!gridEl) {
+        console.error("createGrid: gridEl not found!");
+        return;
+    }
     gridEl.innerHTML = '';
     grid = [];
     
@@ -1628,11 +1652,16 @@ function createGrid(obstacleCount = 0) {
                 attempts++;
             } while (causesMatch(r, c, tile.type.id, row) && attempts < 50);
             
+            if (attempts >= 50) {
+                console.warn(`createGrid: too many attempts at r=${r}, c=${c}`);
+            }
+            
             row.push(tile);
             gridEl.appendChild(tile.el);
         }
         grid.push(row);
     }
+    console.log(`Grid created successfully. Tiles in gridEl: ${gridEl.childElementCount}`);
 
     // 2. Place Obstacles
     let placed = 0;
