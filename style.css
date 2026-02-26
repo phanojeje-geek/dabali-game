@@ -426,13 +426,51 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 }
 
 @media (max-width: 420px) {
+    :root {
+        --tile-size: 38px;
+    }
     #game-board {
         border-width: 6px;
         padding: 4px;
         transform: rotateX(0deg);
+        margin-top: 5px;
     }
     #board-tip {
         top: -26px;
+        font-size: 0.65rem;
+    }
+    #avatar-container {
+        bottom: 85px;
+        left: 5px;
+        width: 50px;
+        height: 50px;
+    }
+    .avatar-face {
+        font-size: 2.5rem;
+    }
+    .header-top {
+        padding: 0 5px;
+    }
+    .level-badge {
+        font-size: 1rem;
+    }
+    .timer-badge {
+        font-size: 0.9rem;
+        padding: 4px 8px;
+    }
+}
+
+@media (max-width: 350px) {
+    :root {
+        --tile-size: 32px;
+    }
+    #avatar-container {
+        bottom: 80px;
+        width: 40px;
+        height: 40px;
+    }
+    .avatar-face {
+        font-size: 2rem;
     }
 }
 
@@ -817,7 +855,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* AVATAR */
 #avatar-container {
     position: absolute;
-    top: -50px;
+    bottom: 90px;
     left: 10px;
     width: 60px;
     height: 60px;
