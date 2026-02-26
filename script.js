@@ -2017,6 +2017,9 @@ function findMatches() {
                 superComboTriggered = true; 
             }
             if (run.length === 4) {
+                run.forEach(t => {
+                    if (t.el) t.el.classList.add('combo-4-anim');
+                });
                 applyLineClear(run, orientation, false);
                 chicComboType = run[0].type.id;
             }
@@ -2577,6 +2580,21 @@ class DabaliGame {
         initGame();
     }
 }
+
+// Online Update Check
+window.addEventListener('online', () => {
+    console.log("Connection restored. Checking for updates...");
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(reg => {
+            reg.update();
+        });
+    }
+    const promoEl = document.getElementById('promo-message');
+    if (promoEl) {
+        promoEl.innerText = "Connexion rétablie !";
+        setTimeout(() => { if(promoEl.innerText === "Connexion rétablie !") promoEl.innerText = ""; }, 3000);
+    }
+});
 
 window.onload = () => {
     const game = new DabaliGame();
