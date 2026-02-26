@@ -429,13 +429,13 @@ const ambientSoundManager = {
             const bufferSize = soundCtx.sampleRate * 2;
             const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
             const data = buffer.getChannelData(0);
+            let lastOut = 0;
             for (let i = 0; i < bufferSize; i++) {
                 const white = Math.random() * 2 - 1;
                 data[i] = (lastOut + (0.02 * white)) / 1.02;
                 lastOut = data[i];
                 data[i] *= 3.5; 
             }
-            let lastOut = 0;
             
             const noise = soundCtx.createBufferSource();
             noise.buffer = buffer;
@@ -955,6 +955,8 @@ const levelSelectOverlay = document.getElementById('level-select-overlay');
 const levelGridEl = document.getElementById('level-grid');
 const levelSelectCloseBtn = document.getElementById('level-select-close');
 const gameBoardEl = document.getElementById('game-board');
+const gameContainerEl = document.getElementById('game-container');
+const headerEl = document.getElementById('header');
 // Menu Elements
 const btnMenu = document.getElementById('menu-btn');
 const drawerMenu = document.getElementById('drawer-menu');
@@ -971,6 +973,26 @@ const splashScreen = document.getElementById('splash-screen');
 const startBtn = document.getElementById('start-btn');
 const progress = document.querySelector('.progress');
 
+function updateTileSize() {
+    if (!gameBoardEl || !gameContainerEl) {
+        console.warn("gameBoardEl or gameContainerEl not found for updateTileSize");
+        return;
+    }
+    const gap = 4;
+    const totalGaps = gap * (GRID_SIZE - 1);
+    const headerHeight = headerEl ? headerEl.offsetHeight : 0;
+    const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
+    const containerWidth = gameContainerEl.clientWidth || window.innerWidth || 320;
+    const containerHeight = gameContainerEl.clientHeight || window.innerHeight || 568;
+    const availableWidth = Math.max(160, containerWidth - 24);
+    const availableHeight = Math.max(160, containerHeight - headerHeight - footerHeight - 24);
+    const base = Math.max(160, Math.min(availableWidth, availableHeight) - 42);
+    const raw = Math.floor((base - totalGaps) / GRID_SIZE);
+    const clamped = Math.max(24, Math.min(72, raw));
+    console.log("Updated Tile Size to:", clamped, "px (from width:", containerWidth, "height:", containerHeight, ")");
+    document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
+}
+
 // INIT
 function initGame() {
     console.log("Dabali Game v1.11 - Init Started");
@@ -980,21 +1002,6 @@ function initGame() {
         } else {
             console.log("#grid element found.");
         }
-    // Responsive tile sizing
-    function updateTileSize() {
-        if (!gameBoardEl) {
-            console.warn("gameBoardEl not found for updateTileSize");
-            return;
-        }
-        const gap = 4; // must match CSS #grid gap
-        const innerWidth = gameBoardEl.clientWidth || 320; // Fallback width if not rendered yet
-        const totalGaps = gap * (GRID_SIZE - 1);
-        const available = Math.max(200, innerWidth - totalGaps);
-        const raw = Math.floor(available / GRID_SIZE);
-        const clamped = Math.max(32, Math.min(64, raw));
-        console.log("Updated Tile Size to:", clamped, "px (from width:", innerWidth, ")");
-        document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
-    }
     updateTileSize();
     window.addEventListener('resize', updateTileSize);
     window.addEventListener('orientationchange', updateTileSize);
@@ -1418,6 +1425,7 @@ function startLevel(lvl, resume = false) {
         renderGoals(); // Initial Render
         updateUI();
         if (modalOverlay) modalOverlay.classList.add('hidden');
+        updateTileSize();
         
         // Create Grid
         console.log("[DEBUG] Creating grid...");
