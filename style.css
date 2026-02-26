@@ -389,6 +389,36 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     transition: transform 0.5s ease;
 }
 
+/* Inner grid that holds the tiles */
+#grid {
+    display: grid;
+    grid-template-columns: repeat(8, var(--tile-size));
+    grid-auto-rows: var(--tile-size);
+    gap: 4px;
+    justify-content: center;
+    align-content: center;
+    margin: 6px auto 10px auto;
+    width: fit-content;
+}
+
+/* Tip banner inside the board */
+#board-tip {
+    position: absolute;
+    top: -34px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(139, 69, 19, 0.9);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    white-space: nowrap;
+    max-width: 95%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Theme specific board borders */
 body.theme-yopougon #game-board {
     border-color: #4B0082;

@@ -954,6 +954,7 @@ const adCopyBtn = document.getElementById('ad-copy-btn');
 const levelSelectOverlay = document.getElementById('level-select-overlay');
 const levelGridEl = document.getElementById('level-grid');
 const levelSelectCloseBtn = document.getElementById('level-select-close');
+const gameBoardEl = document.getElementById('game-board');
 // Menu Elements
 const btnMenu = document.getElementById('menu-btn');
 const drawerMenu = document.getElementById('drawer-menu');
@@ -972,6 +973,21 @@ const progress = document.querySelector('.progress');
 
 // INIT
 function initGame() {
+    // Responsive tile sizing
+    function updateTileSize() {
+        if (!gameBoardEl) return;
+        const gap = 4; // must match CSS #grid gap
+        const innerWidth = gameBoardEl.clientWidth - 10; // account for board padding/border visually
+        const totalGaps = gap * (GRID_SIZE - 1);
+        const available = Math.max(200, innerWidth - totalGaps);
+        const raw = Math.floor(available / GRID_SIZE);
+        const clamped = Math.max(38, Math.min(64, raw));
+        document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
+    }
+    updateTileSize();
+    window.addEventListener('resize', updateTileSize);
+    window.addEventListener('orientationchange', updateTileSize);
+
     // Splash Logic
     if (progress) {
         setTimeout(() => {
