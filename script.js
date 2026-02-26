@@ -978,17 +978,22 @@ function updateTileSize() {
         console.warn("gameBoardEl or gameContainerEl not found for updateTileSize");
         return;
     }
-    const gap = 4;
-    const totalGaps = gap * (GRID_SIZE - 1);
     const headerHeight = headerEl ? headerEl.offsetHeight : 0;
     const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
     const containerWidth = gameContainerEl.clientWidth || window.innerWidth || 320;
     const containerHeight = gameContainerEl.clientHeight || window.innerHeight || 568;
-    const availableWidth = Math.max(160, containerWidth - 24);
-    const availableHeight = Math.max(160, containerHeight - headerHeight - footerHeight - 24);
-    const base = Math.max(160, Math.min(availableWidth, availableHeight) - 42);
+    const availableWidth = Math.max(140, containerWidth - 16);
+    const availableHeight = Math.max(140, containerHeight - headerHeight - footerHeight - 16);
+    const boardStyles = window.getComputedStyle(gameBoardEl);
+    const borderW = parseFloat(boardStyles.borderLeftWidth) || 0;
+    const paddingW = parseFloat(boardStyles.paddingLeft) || 0;
+    const gridGap = gridEl ? (parseFloat(window.getComputedStyle(gridEl).gap) || 4) : 4;
+    const totalGaps = gridGap * (GRID_SIZE - 1);
+    const maxBoardWidth = Math.max(120, availableWidth - (borderW * 2) - (paddingW * 2));
+    const maxBoardHeight = Math.max(120, availableHeight - (borderW * 2) - (paddingW * 2));
+    const base = Math.min(maxBoardWidth, maxBoardHeight);
     const raw = Math.floor((base - totalGaps) / GRID_SIZE);
-    const clamped = Math.max(24, Math.min(72, raw));
+    const clamped = Math.max(20, Math.min(72, raw));
     console.log("Updated Tile Size to:", clamped, "px (from width:", containerWidth, "height:", containerHeight, ")");
     document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
 }

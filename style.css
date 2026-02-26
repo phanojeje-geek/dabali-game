@@ -383,6 +383,10 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     padding: 5px;
     touch-action: none;
     position: relative;
+    width: fit-content;
+    max-width: 100%;
+    margin: 10px auto;
+    align-self: center;
     /* 3D Transform */
     transform-style: preserve-3d;
     transform: rotateX(5deg);
@@ -399,6 +403,7 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     align-content: center;
     margin: 6px auto 10px auto;
     width: fit-content;
+    max-width: 100%;
 }
 
 /* Tip banner inside the board */
@@ -418,6 +423,17 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     overflow: hidden;
     text-overflow: ellipsis;
     z-index: 100;
+}
+
+@media (max-width: 420px) {
+    #game-board {
+        border-width: 6px;
+        padding: 4px;
+        transform: rotateX(0deg);
+    }
+    #board-tip {
+        top: -26px;
+    }
 }
 
 /* Theme specific board borders */
