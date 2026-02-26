@@ -1369,51 +1369,67 @@ function quitGame() {
 }
 
 function startLevel(lvl, resume = false) {
-    console.log(`Starting Level: ${lvl}, Resume: ${resume}`);
+    console.log(`[DEBUG] startLevel called with lvl=${lvl}, resume=${resume}`);
     try {
         if (resume && loadGameState()) {
+            console.log("[DEBUG] Resuming game state...");
+            applyThemeForLevel(level);
+            modalOverlay.classList.add('hidden');
+            // Resume timer
+            startTimer();
+            return;
+        }
+
+        console.log("[DEBUG] Starting new level logic...");
+        clearSavedGame();
+
+        // Loop back to level 1 if max reached (or handle end game)
+        if (!LEVELS || LEVELS.length === 0) {
+            throw new Error("LEVELS array is empty or undefined!");
+        }
+        const levelConfig = LEVELS.find(l => l.id === lvl) || LEVELS[0]; 
+        console.log("[DEBUG] Level config found:", levelConfig);
+        
+        level = levelConfig.id;
         applyThemeForLevel(level);
-        modalOverlay.classList.add('hidden');
-        // Resume timer
+        localStorage.setItem(STORAGE_KEYS.currentLevel, String(level));
+        score = 0;
+        moves = levelConfig.moves;
+        isProcessing = false; // Reset processing flag
+        isPaused = false; // Reset pause flag
+        
+        // Timer Init
+        clearInterval(timerInterval);
+        timeRemaining = 90; // 90 seconds
         startTimer();
-        return;
-    }
+        setAvatarMood('neutral');
 
-    clearSavedGame();
+        // Init Goals
+        if (!levelConfig.goals) {
+            console.warn("[DEBUG] No goals defined for this level, using empty object");
+            currentGoals = {};
+        } else {
+            currentGoals = { ...levelConfig.goals };
+        }
+        goalProgress = {};
+        for (let k in currentGoals) goalProgress[k] = 0;
 
-    // Loop back to level 1 if max reached (or handle end game)
-    const levelConfig = LEVELS.find(l => l.id === lvl) || LEVELS[0]; 
-    level = levelConfig.id;
-    applyThemeForLevel(level);
-    localStorage.setItem(STORAGE_KEYS.currentLevel, String(level));
-    score = 0;
-    moves = levelConfig.moves;
-    isProcessing = false; // Reset processing flag
-    isPaused = false; // Reset pause flag
-    
-    // Timer Init
-    clearInterval(timerInterval);
-    timeRemaining = 90; // 90 seconds
-    startTimer();
-    setAvatarMood('neutral');
-
-    // Init Goals
-    currentGoals = { ...levelConfig.goals };
-    goalProgress = {};
-    for (let k in currentGoals) goalProgress[k] = 0;
-
-    updateUI();
-    renderGoals(); // Initial Render
-    modalOverlay.classList.add('hidden');
-    
-    // Create Grid
-    createGrid(levelConfig.obstacles ? levelConfig.obstacles.count : 0);
-    resetHintTimer();
-    
-    saveGameState(); // Initial save
+        console.log("[DEBUG] Updating UI...");
+        renderGoals(); // Initial Render
+        updateUI();
+        if (modalOverlay) modalOverlay.classList.add('hidden');
+        
+        // Create Grid
+        console.log("[DEBUG] Creating grid...");
+        const obstacleCount = levelConfig.obstacles ? levelConfig.obstacles.count : 0;
+        createGrid(obstacleCount);
+        resetHintTimer();
+        
+        saveGameState(); // Initial save
+        console.log("[DEBUG] startLevel finished successfully");
     } catch (e) {
         console.error("FATAL ERROR in startLevel:", e);
-        alert("Une erreur est survenue lors du démarrage du niveau. Voir la console.");
+        alert("Une erreur est survenue lors du démarrage du niveau: " + e.message);
     }
 }
 
@@ -1633,7 +1649,7 @@ function reshuffleGrid() {
 }
 
 function createGrid(obstacleCount = 0) {
-    console.log(`createGrid: obstacleCount=${obstacleCount}, GRID_SIZE=${GRID_SIZE}`);
+    console.log(`[DEBUG] createGrid: obstacleCount=${obstacleCount}, GRID_SIZE=${GRID_SIZE}`);
     if (!gridEl) {
         console.error("createGrid: gridEl not found!");
         return;
@@ -1641,40 +1657,51 @@ function createGrid(obstacleCount = 0) {
     gridEl.innerHTML = '';
     grid = [];
     
-    // 1. Fill with random ingredients ensuring no matches
-    for (let r = 0; r < GRID_SIZE; r++) {
-        let row = [];
-        for (let c = 0; c < GRID_SIZE; c++) {
-            let tile;
-            let attempts = 0;
-            do {
-                tile = createRandomTile(r, c);
-                attempts++;
-            } while (causesMatch(r, c, tile.type.id, row) && attempts < 50);
-            
-            if (attempts >= 50) {
-                console.warn(`createGrid: too many attempts at r=${r}, c=${c}`);
+    try {
+        // 1. Fill with random ingredients ensuring no matches
+        for (let r = 0; r < GRID_SIZE; r++) {
+            let row = [];
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let tile;
+                let attempts = 0;
+                do {
+                    tile = createRandomTile(r, c);
+                    attempts++;
+                    if (attempts > 100) {
+                         console.error("Infinite loop in createGrid generation");
+                         break;
+                    }
+                } while (causesMatch(r, c, tile.type.id, row) && attempts < 50);
+                
+                if (attempts >= 50) {
+                    console.warn(`createGrid: too many attempts at r=${r}, c=${c}`);
+                }
+                
+                row.push(tile);
+                gridEl.appendChild(tile.el);
             }
-            
-            row.push(tile);
-            gridEl.appendChild(tile.el);
+            grid.push(row);
         }
-        grid.push(row);
-    }
-    console.log(`Grid created successfully. Tiles in gridEl: ${gridEl.childElementCount}`);
+        console.log(`[DEBUG] Grid created successfully. Tiles in gridEl: ${gridEl.childElementCount}`);
 
-    // 2. Place Obstacles
-    let placed = 0;
-    while (placed < obstacleCount) {
-        const r = Math.floor(Math.random() * GRID_SIZE);
-        const c = Math.floor(Math.random() * GRID_SIZE);
-        if (!isObstacleId(grid[r][c].type.id)) {
-            const obstacleType = getRandomObstacleForLevel(level);
-            grid[r][c].type = obstacleType;
-            renderTileContent(grid[r][c].el, grid[r][c].type);
-            grid[r][c].el.classList.add('obstacle');
-            placed++;
+        // 2. Place Obstacles
+        let placed = 0;
+        let safety = 0;
+        while (placed < obstacleCount && safety < 1000) {
+            safety++;
+            const r = Math.floor(Math.random() * GRID_SIZE);
+            const c = Math.floor(Math.random() * GRID_SIZE);
+            if (grid[r] && grid[r][c] && !isObstacleId(grid[r][c].type.id)) {
+                const obstacleType = getRandomObstacleForLevel(level);
+                grid[r][c].type = obstacleType;
+                renderTileContent(grid[r][c].el, grid[r][c].type);
+                grid[r][c].el.classList.add('obstacle');
+                placed++;
+            }
         }
+    } catch (e) {
+        console.error("FATAL ERROR in createGrid:", e);
+        throw e; // Re-throw to be caught by startLevel
     }
     
     // Resolve initial matches without score
