@@ -233,8 +233,7 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     50% { transform: translateY(-10px); }
 }
 
-/* Game Container */0.3;
-}
+/* Game Container */
 .city-lights {
     position: absolute;
     width: 100%;
@@ -899,4 +898,55 @@ input:checked + .slider:before { transform: translateX(26px); }
 @keyframes confettiFall {
     0% { transform: translateY(0) rotate(0); opacity: 1; }
     100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* CREDITS */
+.credits-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #666;
+}
+.credits-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+.credits-section .role {
+    font-style: italic;
+    color: #888;
+    margin-bottom: 5px;
+}
+.credits-section .vibe {
+    font-size: 0.8rem;
+    color: #FF69B4;
+    margin-top: 5px;
+}
+.dedications {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px dashed #ddd;
+}
+.dedications h4 {
+    margin: 10px 0 5px 0;
+    color: var(--secondary-color);
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.thanks-note {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 15px !important;
+    font-style: italic;
+}
+.dedications p {
+    margin: 8px 0;
+    line-height: 1.4;
+}
+.role-small {
+    font-size: 0.85rem;
+    color: #777;
+    font-style: italic;
 }

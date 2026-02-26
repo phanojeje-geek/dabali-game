@@ -28,7 +28,9 @@ const STORAGE_KEYS = {
     bestStars: 'dabali_best_stars',
     freeSuperCombos: 'dabali_free_super_combos',
     gameState: 'dabali_game_state_v1',
-    music: 'dabali_music'
+    music: 'dabali_music',
+    bonusLevels: 'dabali_bonus_levels',
+    usedPromoCodes: 'dabali_used_promo_codes'
 };
 
 // ... (Existing code)
@@ -733,16 +735,63 @@ function redeemPromoCode() {
         vibrate([120, 60, 120]);
         return;
     }
+
+    // Check used codes
+    const rawUsed = localStorage.getItem(STORAGE_KEYS.usedPromoCodes);
+    const usedCodes = rawUsed ? JSON.parse(rawUsed) : [];
+    if (usedCodes.includes(raw)) {
+        promoMessageEl.innerText = 'Ce code a déjà été utilisé !';
+        soundManager.playError();
+        vibrate([120, 60, 120]);
+        return;
+    }
+
     if (config.type === 'unlock_level') {
-        const current = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
-        const maxUnlocked = Number.isFinite(current) ? current : 1;
-        const target = maxUnlocked + 2;
-        localStorage.setItem(STORAGE_KEYS.maxUnlockedLevel, String(target));
+        const currentMaxRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
+        const maxUnlocked = Number.isFinite(currentMaxRaw) ? currentMaxRaw : 1;
+        
+        // Retrieve already unlocked bonus levels
+        const rawBonus = localStorage.getItem(STORAGE_KEYS.bonusLevels);
+        const bonusLevels = rawBonus ? JSON.parse(rawBonus) : [];
+        
+        // Check if user already has a pending bonus level (unlocked via promo but not reached naturally)
+        const pendingBonus = bonusLevels.find(id => id > maxUnlocked);
+        if (pendingBonus) {
+            promoMessageEl.innerText = `Tu as déjà le niveau ${pendingBonus} débloqué ! Joue-le pour en débloquer d'autres.`;
+            soundManager.playError();
+            return;
+        }
+        
+        // Find candidates: levels > maxUnlocked AND not already in bonusLevels
+        const candidates = LEVELS.filter(l => l.id > maxUnlocked && !bonusLevels.includes(l.id));
+        
+        if (candidates.length === 0) {
+            promoMessageEl.innerText = 'Tous les niveaux sont déjà débloqués !';
+            soundManager.playError();
+            return;
+        }
+        
+        // Pick one random level
+        const randomLevel = candidates[Math.floor(Math.random() * candidates.length)];
+        
+        // Unlock it
+        bonusLevels.push(randomLevel.id);
+        localStorage.setItem(STORAGE_KEYS.bonusLevels, JSON.stringify(bonusLevels));
+        
+        // Mark code as used
+        usedCodes.push(raw);
+        localStorage.setItem(STORAGE_KEYS.usedPromoCodes, JSON.stringify(usedCodes));
+        
+        config.message = `Niveau ${randomLevel.id} débloqué !`;
     }
     if (config.type === 'free_super') {
         freeSuperCombos += config.count;
         localStorage.setItem(STORAGE_KEYS.freeSuperCombos, String(freeSuperCombos));
         updateFreeSuperDisplay();
+        
+        // Mark code as used
+        usedCodes.push(raw);
+        localStorage.setItem(STORAGE_KEYS.usedPromoCodes, JSON.stringify(usedCodes));
     }
     soundManager.playPromoSuccess();
     vibrate([80, 40, 80, 40, 120]);
@@ -1194,15 +1243,24 @@ function openLevelSelect() {
     levelGridEl.innerHTML = '';
     const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
     const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
+    
+    const rawBonus = localStorage.getItem(STORAGE_KEYS.bonusLevels);
+    const bonusLevels = rawBonus ? JSON.parse(rawBonus) : [];
+    
     const rawStars = localStorage.getItem(STORAGE_KEYS.bestStars);
     const starsMap = rawStars ? JSON.parse(rawStars) : {};
+    
     LEVELS.forEach(cfg => {
         const btn = document.createElement('button');
         btn.className = 'level-button';
         const stars = starsMap[String(cfg.id)] || 0;
         btn.innerText = stars > 0 ? `${cfg.id} (${stars}⭐)` : String(cfg.id);
         btn.title = getLevelGroupName(cfg.id);
-        if (cfg.id > maxUnlocked) {
+        
+        // Unlocked if <= maxUnlocked OR in bonusLevels
+        const isUnlocked = (cfg.id <= maxUnlocked) || bonusLevels.includes(cfg.id);
+        
+        if (!isUnlocked) {
             btn.disabled = true;
             btn.classList.add('locked');
         } else {
@@ -1210,6 +1268,10 @@ function openLevelSelect() {
                 levelSelectOverlay.classList.add('hidden');
                 startLevel(cfg.id);
             });
+            if (bonusLevels.includes(cfg.id) && cfg.id > maxUnlocked) {
+                btn.style.border = '2px solid gold';
+                btn.style.boxShadow = '0 0 10px gold';
+            }
         }
         if (cfg.id === level) btn.classList.add('current');
         levelGridEl.appendChild(btn);
