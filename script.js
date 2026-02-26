@@ -412,9 +412,11 @@ const soundManager = {
         osc.stop(soundCtx.currentTime + duration);
     },
     playClick: () => soundManager.playTone(400, 'sine', 0.1),
-    playMatch: () => {
-        soundManager.playTone(600, 'sine', 0.1);
-        setTimeout(() => soundManager.playTone(800, 'sine', 0.2), 100);
+    playMatch: (comboMultiplier = 1) => {
+        const baseFreq = 600;
+        const pitch = Math.min(1200, baseFreq + ((comboMultiplier - 1) * 50));
+        soundManager.playTone(pitch, 'sine', 0.1);
+        setTimeout(() => soundManager.playTone(pitch * 1.33, 'sine', 0.2), 100);
     },
     playBonDabali: () => {
         soundManager.playTone(400, 'square', 0.1);
@@ -1071,7 +1073,10 @@ function resetHintTimer() {
 
 function clearHints() {
     if (currentHint) {
-        currentHint.forEach(el => el.classList.remove('hint-anim'));
+        currentHint.forEach(el => {
+            if (el.classList.contains('tile')) el.classList.remove('hint-anim');
+            if (el.classList.contains('hand-hint')) el.remove();
+        });
         currentHint = null;
     }
 }
@@ -1136,10 +1141,6 @@ function checkMatchAt(r, c) {
     i = r + 1; while(i<GRID_SIZE && grid[i][c].type.id === typeId) { vCount++; i++; }
     if (vCount >= 3) return true;
     
-    // Check Recipe (Simplified - just check if it's part of a 3-set that matches recipe ingredients)
-    // This is complex to check virtually without full findMatches logic.
-    // For hints, finding standard matches is usually enough.
-    
     return false;
 }
 
@@ -1148,7 +1149,25 @@ function applyHint(r1, c1, r2, c2) {
     const el2 = grid[r2][c2].el;
     el1.classList.add('hint-anim');
     el2.classList.add('hint-anim');
-    currentHint = [el1, el2];
+    
+    // Hand logic
+    const hand = document.createElement('div');
+    hand.className = 'hand-hint';
+    const rect1 = el1.getBoundingClientRect();
+    const rect2 = el2.getBoundingClientRect();
+    
+    hand.style.left = (rect1.left + rect1.width/2 - 20) + 'px'; // 20 is half width
+    hand.style.top = (rect1.top + rect1.height/2 - 20) + 'px';
+    
+    const dx = (rect2.left - rect1.left);
+    const dy = (rect2.top - rect1.top);
+    
+    hand.style.setProperty('--dx', `${dx}px`);
+    hand.style.setProperty('--dy', `${dy}px`);
+    
+    document.body.appendChild(hand);
+    
+    currentHint = [el1, el2, hand];
 }
 
 function updateTimerUI() {
@@ -1751,7 +1770,7 @@ async function processMatches(matches) {
         spawnMatchParticles(rect.left + rect.width/2, rect.top + rect.height/2, color);
     });
 
-    soundManager.playMatch();
+    soundManager.playMatch(comboCount || 1);
     setAvatarMood('angry');
 
     if (comboCount > 1) {
@@ -1909,8 +1928,81 @@ function showComboText(count) {
     }, 800);
     
     vibrate([50, 50, 50]);
-    soundManager.playMatch(); 
 }
+
+function triggerConfetti() {
+    const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f', '#fff', '#ffd700'];
+    const count = 100;
+    
+    for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        el.style.opacity = Math.random();
+        el.style.transform = `rotate(${Math.random() * 360}deg)`;
+        
+        document.body.appendChild(el);
+        
+        setTimeout(() => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        }, 4000);
+    }
+}
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallButton();
+});
+
+function showInstallButton() {
+    const header = document.querySelector('.header-top');
+    if (!header) return;
+    
+    // Check if button already exists
+    if (document.getElementById('install-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'install-btn';
+    btn.innerHTML = '<i class="fas fa-download"></i>';
+    btn.title = "Installer l'App";
+    btn.style.background = '#2E8B57'; // Green
+    btn.style.border = '2px solid #fff';
+    btn.style.borderRadius = '50%';
+    btn.style.color = '#fff';
+    btn.style.width = '35px';
+    btn.style.height = '35px';
+    btn.style.cursor = 'pointer';
+    btn.style.marginLeft = '5px';
+    btn.style.display = 'flex';
+    btn.style.justifyContent = 'center';
+    btn.style.alignItems = 'center';
+    btn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+    
+    btn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                deferredPrompt = null;
+                btn.remove();
+            }
+        }
+    });
+    
+    // Insert before menu button or pause button
+    const pauseBtn = document.getElementById('pause-btn');
+    if (pauseBtn) {
+        header.insertBefore(btn, pauseBtn);
+    } else {
+        header.appendChild(btn);
+    }
+}
+
 
 function checkGameEnd() {
     // Win Condition
@@ -1926,6 +2018,7 @@ function checkGameEnd() {
         clearInterval(timerInterval);
         setTimeout(() => {
             showBonDabali(); // Extra celebration
+            triggerConfetti();
             setTimeout(() => {
                 vibrate([150, 80, 150, 80, 320]);
                 soundManager.playWin();
