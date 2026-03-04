@@ -254,22 +254,29 @@
                 navigator.serviceWorker.register('./sw.js').then(reg => {
                     console.log('SW registered:', reg);
                     
+                    const showUpdateToast = (worker) => {
+                        const toast = document.getElementById('update-toast');
+                        const btn = document.getElementById('update-btn');
+                        if (toast && btn) {
+                            toast.classList.add('show');
+                            btn.onclick = () => {
+                                worker.postMessage({ type: 'SKIP_WAITING' });
+                                window.location.reload();
+                            };
+                        }
+                    };
+
+                    // Check if there is already a waiting worker
+                    if (reg.waiting) {
+                        showUpdateToast(reg.waiting);
+                    }
+
                     reg.onupdatefound = () => {
                         const installingWorker = reg.installing;
                         installingWorker.onstatechange = () => {
                             if (installingWorker.state === 'installed') {
                                 if (navigator.serviceWorker.controller) {
-                                    // Show custom toast instead of alert
-                                    const toast = document.getElementById('update-toast');
-                                    const btn = document.getElementById('update-btn');
-                                    if (toast && btn) {
-                                        toast.classList.add('show');
-                                        btn.onclick = () => {
-                                            // Send skipWaiting to the new service worker
-                                            installingWorker.postMessage({ type: 'SKIP_WAITING' });
-                                            window.location.reload();
-                                        };
-                                    }
+                                    showUpdateToast(installingWorker);
                                 }
                             }
                         };

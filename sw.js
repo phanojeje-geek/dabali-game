@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dabali-v11';
+const CACHE_NAME = 'dabali-v12';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -6,7 +6,9 @@ const ASSETS_TO_CACHE = [
     './script.js',
     './manifest.json',
     './assets/icone_dabali.png',
-    './assets/splash.jpg'
+    './assets/splash.jpg',
+    './assets/maggi.png',
+    './assets/icon.svg'
 ];
 
 // Installation

@@ -1232,6 +1232,47 @@ input:checked + .slider:before { transform: translateX(26px); }
     40%, 60% { transform: translate3d(8px, 0, 0); }
 }
 
+/* UPDATE TOAST */
+#update-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    z-index: 5000;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    width: 90%;
+    max-width: 400px;
+    font-size: 0.9rem;
+}
+
+#update-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+#update-btn {
+    background: #ffeb3b;
+    color: #333;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+#update-btn:hover {
+    background: #fbc02d;
+}
+
 /* CONFETTI */
 .confetti {
     position: fixed;
