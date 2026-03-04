@@ -2380,7 +2380,6 @@ async function processMatches(matches) {
     await new Promise(r => setTimeout(r, 300));
     
     // 2. Refill (Gravity)
-    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
     const layout = levelConfig.layout;
 
     for (let c = 0; c < GRID_SIZE; c++) {
@@ -2556,6 +2555,8 @@ function checkGameEnd() {
         }
     }
 
+    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
+
     if (allGoalsCompleted) {
         clearInterval(timerInterval);
         setTimeout(() => {
@@ -2564,7 +2565,6 @@ function checkGameEnd() {
             setTimeout(() => {
                 vibrate([150, 80, 150, 80, 320]);
                 soundManager.playWin();
-                const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
                 const stars = computeStars(score, levelConfig);
                 saveBestScoreAndStars(level, score, stars);
                 updateModalStars(stars);
