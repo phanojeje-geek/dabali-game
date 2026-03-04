@@ -266,12 +266,16 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
 }
 
-/* Header */
+/* HEADER STYLE - Candy Crush Style */
 #header {
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(5px);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    background: linear-gradient(to bottom, #4fc3f7, #29b6f6);
+    padding: 10px 15px;
+    border-radius: 0 0 25px 25px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    display: flex; 
+    flex-direction: column;
+    gap: 8px;
+    color: white;
     z-index: 100;
 }
 
@@ -279,83 +283,105 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+}
+
+.level-info {
+    text-align: center;
 }
 
 .level-badge {
     font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--secondary-color);
-    text-transform: uppercase;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+}
+
+.header-main {
+    display: grid;
+    grid-template-columns: 1fr 60px 80px;
+    align-items: center;
+    gap: 15px;
+}
+
+.progress-container {
+    position: relative;
+    padding: 10px 0;
+}
+
+.stars-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.stars-markers i {
+    position: absolute;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    transform: translateY(-50%);
+    top: 50%;
+}
+
+.marker-1 { left: 33%; }
+.marker-2 { left: 66%; }
+.marker-3 { left: 95%; }
+
+.stars-markers i.active {
+    color: gold;
+    text-shadow: 0 0 5px orange;
+}
+
+.progress-bar-bg {
+    height: 18px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 9px;
+    overflow: hidden;
+    border: 2px solid white;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to bottom, #ffeb3b, #fbc02d);
+    border-radius: 9px;
+    transition: width 0.3s ease-out;
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2);
+}
+
+.moves-container, .score-container {
+    background: rgba(255,255,255,0.2);
+    padding: 5px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.moves-label, .score-label {
+    font-size: 0.6rem;
+    font-weight: bold;
+    opacity: 0.8;
+}
+
+.moves-value, .score-value {
+    font-size: 1.2rem;
+    font-weight: 900;
+}
+
+.header-bottom {
     text-align: center;
 }
 
-#level-group-display {
-    font-size: 0.7rem;
-    color: #666;
-    font-weight: normal;
-}
-
-.timer-badge {
-    font-size: 1rem;
+.timer-text {
+    font-size: 0.8rem;
     font-weight: bold;
-    color: #fff;
-    background: #333;
-    padding: 5px 10px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: all 0.3s;
-}
-
-.header-btn, #menu-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: var(--secondary-color);
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.header-btn:active, #menu-btn:active {
-    transform: scale(0.9);
-}
-
-.header-stats {
-    display: flex;
-    justify-content: space-around;
-    gap: 10px;
-}
-
-.stat-box {
-    background: #fff;
-    padding: 5px 15px;
-    border-radius: 12px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: bold;
-    font-size: 1.1rem;
-    color: var(--text-color);
-    position: relative;
-}
-
-#free-super-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: #ff4500;
-    color: white;
-    font-size: 0.7rem;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 2px 2px rgba(0,0,0,0.2);
+    background: rgba(0,0,0,0.1);
+    padding: 2px 10px;
+    border-radius: 10px;
+    display: inline-block;
 }
 
 /* GAME BOARD */
@@ -487,20 +513,54 @@ body.theme-cocody #game-board {
 .tile {
     width: var(--tile-size, 40px);
     height: var(--tile-size, 40px);
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 0.9) 100%);
+    border-radius: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: calc(var(--tile-size, 40px) * 0.65);
+    font-size: calc(var(--tile-size, 40px) * 0.7);
     cursor: pointer;
     user-select: none;
     transition: transform 0.2s, background-color 0.2s, opacity 0.2s;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    box-shadow: 
+        0 4px 0 rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.8);
     position: relative;
     z-index: 10;
     /* 3D Tile Effect */
     transform: translateZ(0);
+    overflow: hidden;
+}
+
+/* Glossy highlight */
+.tile::after {
+    content: '';
+    position: absolute;
+    top: 5%;
+    left: 10%;
+    width: 80%;
+    height: 35%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 100%);
+    border-radius: 10px 10px 50% 50%;
+    pointer-events: none;
+}
+
+.tile-empty {
+    width: var(--tile-size, 40px);
+    height: var(--tile-size, 40px);
+    background: transparent;
+    border-radius: 8px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Add a background for the grid area where tiles are */
+#grid {
+    display: grid;
+    grid-gap: 4px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 15px;
 }
 
 .tile:active {
@@ -580,18 +640,72 @@ body.theme-cocody #game-board {
     animation: jumpHappy 0.6s ease-out;
 }
 
-/* FOOTER GOALS */
+/* FOOTER & BOOSTERS */
+#footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+    background: linear-gradient(to top, rgba(0,0,0,0.1) 0%, transparent 100%);
+    z-index: 100;
+}
+
 #footer-goals {
-    height: 80px;
-    background: rgba(255, 255, 255, 0.4);
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 15px;
+    background: rgba(255,255,255,0.2);
+    padding: 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.boosters-container {
+    display: flex;
+    justify-content: space-around;
+    padding: 5px 0;
+}
+
+.booster-item {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    margin: 0 10px 10px 10px;
-    border-radius: 15px;
-    overflow-x: auto;
-    z-index: 10;
+    gap: 5px;
+    background: linear-gradient(to bottom, #4caf50, #2e7d32);
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    justify-content: center;
+    border: 2px solid white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.booster-item:active {
+    transform: scale(0.9);
+}
+
+.booster-icon {
+    font-size: 1.2rem;
+}
+
+.booster-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff4081;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1.5px solid white;
 }
 
 .goal-item {

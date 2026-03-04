@@ -222,17 +222,127 @@ function spawnMatchParticles(x, y, color) {
 
 
 const LEVELS = [
-    { id: 1, moves: 20, goals: { attieke: 10, poisson: 10 } },
-    { id: 2, moves: 25, goals: { attieke: 10, poisson: 10, piment: 10 } },
-    { id: 3, moves: 30, goals: { attieke: 15, poisson: 15, huile: 10 }, obstacles: { count: 3 } },
-    { id: 4, moves: 30, goals: { attieke: 15, poisson: 15, piment: 15, tomate: 10 }, obstacles: { count: 5 } },
-    { id: 5, moves: 35, goals: { attieke: 20, poisson: 20, piment: 20, oignon: 15, huile: 15 }, obstacles: { count: 6 } },
+    { id: 1, moves: 20, goals: { attieke: 10, poisson: 10 }, 
+      layout: [
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1]
+      ]
+    },
+    { id: 2, moves: 25, goals: { attieke: 10, poisson: 10, piment: 10 },
+      layout: [
+        [0,1,1,1,1,1,1,0],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [0,1,1,1,1,1,1,0]
+      ]
+    },
+    { id: 3, moves: 30, goals: { attieke: 15, poisson: 15, huile: 10 }, obstacles: { count: 3 },
+      layout: [
+        [1,1,1,0,0,1,1,1],
+        [1,1,1,0,0,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,0,0,1,1,1],
+        [1,1,1,0,0,1,1,1]
+      ]
+    },
+    { id: 4, moves: 30, goals: { attieke: 15, poisson: 15, piment: 15, tomate: 10 }, obstacles: { count: 5 },
+      layout: [
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,0,0,1,1,0,0,1],
+        [1,0,0,1,1,0,0,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1]
+      ]
+    },
+    { id: 5, moves: 35, goals: { attieke: 20, poisson: 20, piment: 20, oignon: 15, huile: 15 }, obstacles: { count: 6 },
+      layout: [
+        [0,0,1,1,1,1,0,0],
+        [0,1,1,1,1,1,1,0],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [0,1,1,1,1,1,1,0],
+        [0,0,1,1,1,1,0,0]
+      ]
+    },
 
-    { id: 6, moves: 30, goals: { maggi: 15, huile: 15, tomate: 15 }, obstacles: { count: 8 } },
-    { id: 7, moves: 30, goals: { attieke: 25, poisson: 25 }, obstacles: { count: 10 } },
-    { id: 8, moves: 35, goals: { piment: 30, oignon: 30, maggi: 10 }, obstacles: { count: 12 } },
-    { id: 9, moves: 35, goals: { attieke: 20, poisson: 20, huile: 20, tomate: 20 }, obstacles: { count: 10 } },
-    { id: 10, moves: 40, goals: { maggi: 25, piment: 25, oignon: 25 }, obstacles: { count: 14 } },
+    { id: 6, moves: 30, goals: { maggi: 15, huile: 15, tomate: 15 }, obstacles: { count: 8 },
+      layout: [
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,0,0,0,0,1,1],
+        [1,1,0,1,1,0,1,1],
+        [1,1,0,1,1,0,1,1],
+        [1,1,0,0,0,0,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1]
+      ]
+    },
+    { id: 7, moves: 30, goals: { attieke: 25, poisson: 25 }, obstacles: { count: 10 },
+      layout: [
+        [0,0,0,1,1,0,0,0],
+        [0,0,1,1,1,1,0,0],
+        [0,1,1,1,1,1,1,0],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [0,1,1,1,1,1,1,0],
+        [0,0,1,1,1,1,0,0],
+        [0,0,0,1,1,0,0,0]
+      ]
+    },
+    { id: 8, moves: 35, goals: { piment: 30, oignon: 30, maggi: 10 }, obstacles: { count: 12 },
+      layout: [
+        [1,1,1,1,1,1,1,1],
+        [1,0,1,1,1,1,0,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,0,0,1,1,1],
+        [1,1,1,0,0,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,0,1,1,1,1,0,1],
+        [1,1,1,1,1,1,1,1]
+      ]
+    },
+    { id: 9, moves: 35, goals: { attieke: 20, poisson: 20, huile: 20, tomate: 20 }, obstacles: { count: 10 },
+      layout: [
+        [1,1,0,1,1,0,1,1],
+        [1,1,0,1,1,0,1,1],
+        [0,0,0,0,0,0,0,0],
+        [1,1,0,1,1,0,1,1],
+        [1,1,0,1,1,0,1,1],
+        [0,0,0,0,0,0,0,0],
+        [1,1,0,1,1,0,1,1],
+        [1,1,0,1,1,0,1,1]
+      ]
+    },
+    { id: 10, moves: 40, goals: { maggi: 25, piment: 25, oignon: 25 }, obstacles: { count: 14 },
+      layout: [
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,0,1,1,0,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,0,1,1,0,1,1],
+        [1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1]
+      ]
+    },
 
     { id: 11, moves: 30, goals: { attieke: 50 }, obstacles: { count: 15 } },
     { id: 12, moves: 35, goals: { poisson: 30, huile: 30 }, obstacles: { count: 16 } },
@@ -1670,11 +1780,22 @@ function createGrid(obstacleCount = 0) {
     gridEl.innerHTML = '';
     grid = [];
     
+    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
+    const layout = levelConfig.layout;
+
     try {
-        // 1. Fill with random ingredients ensuring no matches
         for (let r = 0; r < GRID_SIZE; r++) {
             let row = [];
             for (let c = 0; c < GRID_SIZE; c++) {
+                // If layout exists and is 0, skip creating a tile
+                if (layout && layout[r] && layout[r][c] === 0) {
+                    const emptyEl = document.createElement('div');
+                    emptyEl.className = 'tile-empty';
+                    gridEl.appendChild(emptyEl);
+                    row.push(null);
+                    continue;
+                }
+
                 let tile;
                 let attempts = 0;
                 do {
@@ -1685,10 +1806,6 @@ function createGrid(obstacleCount = 0) {
                          break;
                     }
                 } while (causesMatch(r, c, tile.type.id, row) && attempts < 50);
-                
-                if (attempts >= 50) {
-                    console.warn(`createGrid: too many attempts at r=${r}, c=${c}`);
-                }
                 
                 row.push(tile);
                 gridEl.appendChild(tile.el);
@@ -1704,6 +1821,7 @@ function createGrid(obstacleCount = 0) {
             safety++;
             const r = Math.floor(Math.random() * GRID_SIZE);
             const c = Math.floor(Math.random() * GRID_SIZE);
+            // Check if grid[r][c] is not null and not already an obstacle
             if (grid[r] && grid[r][c] && !isObstacleId(grid[r][c].type.id)) {
                 const obstacleType = getRandomObstacleForLevel(level);
                 grid[r][c].type = obstacleType;
@@ -1714,12 +1832,8 @@ function createGrid(obstacleCount = 0) {
         }
     } catch (e) {
         console.error("FATAL ERROR in createGrid:", e);
-        throw e; // Re-throw to be caught by startLevel
+        throw e;
     }
-    
-    // Resolve initial matches without score
-    // REMOVED to prevent initial scoring
-    // setTimeout(resolveMatchesLoop, 100);
 }
 
 function renderGoals() {
@@ -2036,7 +2150,7 @@ function findMatches() {
         let run = [];
         for (let c = 0; c < GRID_SIZE; c++) {
             const t = grid[r][c];
-            if (isObstacleId(t.type.id)) {
+            if (!t || isObstacleId(t.type.id)) {
                 checkRun(run, 'row'); run = []; continue;
             }
             if (run.length === 0 || run[run.length-1].type.id === t.type.id) {
@@ -2053,7 +2167,7 @@ function findMatches() {
         let run = [];
         for (let r = 0; r < GRID_SIZE; r++) {
             const t = grid[r][c];
-            if (isObstacleId(t.type.id)) {
+            if (!t || isObstacleId(t.type.id)) {
                 checkRun(run, 'col'); run = []; continue;
             }
             if (run.length === 0 || run[run.length-1].type.id === t.type.id) {
@@ -2070,7 +2184,7 @@ function findMatches() {
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE - 2; c++) {
             const tilesToCheck = [grid[r][c], grid[r][c+1], grid[r][c+2]];
-            if (checkRecipe(tilesToCheck)) {
+            if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
                 tilesToCheck.forEach(t => matches.add(t));
                 showBonDabali(); // Recipe always triggers Bon Dabali
             }
@@ -2080,7 +2194,7 @@ function findMatches() {
     for (let c = 0; c < GRID_SIZE; c++) {
         for (let r = 0; r < GRID_SIZE - 2; r++) {
             const tilesToCheck = [grid[r][c], grid[r+1][c], grid[r+2][c]];
-            if (checkRecipe(tilesToCheck)) {
+            if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
                 tilesToCheck.forEach(t => matches.add(t));
                 showBonDabali();
             }
@@ -2088,7 +2202,6 @@ function findMatches() {
     }
     
     // 3. Handle Obstacle Destruction (Adjacent to matches)
-    // We do this by iterating current matches and checking neighbors
     const currentMatches = Array.from(matches);
     currentMatches.forEach(t => {
         const neighbors = [
@@ -2099,7 +2212,7 @@ function findMatches() {
         neighbors.forEach(n => {
             if (n.r >= 0 && n.r < GRID_SIZE && n.c >= 0 && n.c < GRID_SIZE) {
                 const neighborTile = grid[n.r][n.c];
-                if (isObstacleId(neighborTile.type.id) && !matches.has(neighborTile)) {
+                if (neighborTile && isObstacleId(neighborTile.type.id) && !matches.has(neighborTile)) {
                     if (neighborTile.type.id === 'rock') return;
                     matches.add(neighborTile);
                     score += 20;
@@ -2112,7 +2225,7 @@ function findMatches() {
         for (let r = 0; r < GRID_SIZE; r++) {
             for (let c = 0; c < GRID_SIZE; c++) {
                 const t = grid[r][c];
-                if (!isObstacleId(t.type.id) && t.type.id === chicComboType) {
+                if (t && !isObstacleId(t.type.id) && t.type.id === chicComboType) {
                     matches.add(t);
                 }
             }
@@ -2206,6 +2319,10 @@ async function processMatches(matches) {
         spawnMatchParticles(rect.left + rect.width/2, rect.top + rect.height/2, color);
     });
 
+    if (matches.length >= 4) {
+        triggerShake();
+    }
+
     soundManager.playMatch(comboCount || 1);
     setAvatarMood('angry');
 
@@ -2263,54 +2380,43 @@ async function processMatches(matches) {
     await new Promise(r => setTimeout(r, 300));
     
     // 2. Refill (Gravity)
-    // For each column, move tiles down
+    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
+    const layout = levelConfig.layout;
+
     for (let c = 0; c < GRID_SIZE; c++) {
-        let emptySlots = 0;
-        // Identify matches in this column
-        let colMatches = [];
-        for (let r = 0; r < GRID_SIZE; r++) {
-             if (matches.includes(grid[r][c])) {
-                 colMatches.push(r);
-             }
-        }
-        
-        if (colMatches.length === 0) continue;
-
-        // Bubble down logic:
-        // Create a new array for this column with non-matched tiles
-        let newColTypes = [];
-        for (let r = 0; r < GRID_SIZE; r++) {
-            if (!matches.includes(grid[r][c])) {
-                newColTypes.push(grid[r][c].type);
+        // Collect types that are staying in this column (not matches, not holes)
+        let stayingTypes = [];
+        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+            const tile = grid[r][c];
+            if (tile && !matches.includes(tile)) {
+                stayingTypes.push(tile.type);
             }
         }
 
-        // Add new randoms at start
-        let addedCount = GRID_SIZE - newColTypes.length;
-        for (let i = 0; i < addedCount; i++) {
-            newColTypes.unshift(INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)]);
-        }
+        // Fill slots from bottom to top
+        let stayingIdx = 0;
+        let addedInCol = 0;
+        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+            const isHole = layout && layout[r] && layout[r][c] === 0;
+            if (isHole) continue;
 
-        // Apply back
-        for (let r = 0; r < GRID_SIZE; r++) {
-            // If the type changed, it means it's a new tile or moved tile
-            // For animation, we should ideally know if it fell or spawned.
-            // Simplified: If it's in the top 'addedCount' rows, it's a spawn/drop.
-            
-            grid[r][c].type = newColTypes[r];
-            
-            // Reset classes first, then render
-            grid[r][c].el.className = 'tile'; 
+            if (stayingIdx < stayingTypes.length) {
+                grid[r][c].type = stayingTypes[stayingIdx++];
+            } else {
+                // New tile
+                grid[r][c].type = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+                addedInCol++;
+                
+                // Drop animation for new tiles
+                grid[r][c].el.classList.remove('drop-anim');
+                void grid[r][c].el.offsetWidth;
+                grid[r][c].el.classList.add('drop-anim');
+            }
+
+            // Render the updated tile
+            grid[r][c].el.className = 'tile';
             renderTileContent(grid[r][c].el, grid[r][c].type);
-            
             if (isObstacleId(grid[r][c].type.id)) grid[r][c].el.classList.add('obstacle');
-            
-            // Add drop animation if it was updated
-            if (r < addedCount) {
-                 grid[r][c].el.classList.remove('drop-anim'); // reset
-                 void grid[r][c].el.offsetWidth; // trigger reflow
-                 grid[r][c].el.classList.add('drop-anim');
-            }
         }
     }
     
@@ -2509,12 +2615,37 @@ function nextLevel() {
 }
 
 function updateUI() {
-    scoreEl.innerText = score;
-    movesEl.innerText = moves;
+    const scoreValEl = document.getElementById('score-display');
+    const movesValEl = document.getElementById('moves-display');
+    const scoreProgressEl = document.getElementById('score-progress');
+    
+    if (scoreValEl) scoreValEl.innerText = score;
+    if (movesValEl) movesValEl.innerText = moves;
+    
     document.getElementById('level-display').innerText = level;
     if (levelGroupEl) {
         levelGroupEl.innerText = getLevelGroupName(level);
     }
+
+    // Progress Bar and Stars
+    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
+    const base = levelConfig.moves || 1;
+    const threeStarsScore = base * 30;
+    const progressPercent = Math.min(100, (score / threeStarsScore) * 100);
+    
+    if (scoreProgressEl) {
+        scoreProgressEl.style.width = `${progressPercent}%`;
+    }
+
+    // Star markers update
+    const star1 = document.querySelector('.marker-1');
+    const star2 = document.querySelector('.marker-2');
+    const star3 = document.querySelector('.marker-3');
+    
+    if (star1) star1.classList.toggle('active', progressPercent >= 33);
+    if (star2) star2.classList.toggle('active', progressPercent >= 66);
+    if (star3) star3.classList.toggle('active', progressPercent >= 95);
+
     updateFreeSuperDisplay();
     
     // Goals Update
