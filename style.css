@@ -671,52 +671,61 @@ body.theme-cocody #game-board {
     backdrop-filter: blur(5px);
 }
 
+/* BOOSTERS */
 .boosters-container {
     display: flex;
-    justify-content: space-around;
-    padding: 5px 0;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 70px; /* Espace pour l'avatar en dessous */
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    z-index: 2500; /* Au-dessus de l'avatar */
 }
 
 .booster-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
-    background: linear-gradient(to bottom, #4caf50, #2e7d32);
-    width: 50px;
-    height: 50px;
-    border-radius: 25px;
-    justify-content: center;
-    border: 2px solid white;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    position: relative;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.1s;
+    position: relative;
 }
 
 .booster-item:active {
     transform: scale(0.9);
 }
 
-.booster-icon {
-    font-size: 1.2rem;
+.booster-item.active {
+    background: gold;
+    border-radius: 50%;
+    box-shadow: 0 0 10px gold;
 }
 
-.booster-count {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff4081;
-    color: white;
-    font-size: 0.7rem;
-    font-weight: bold;
-    width: 18px;
-    height: 18px;
-    border-radius: 9px;
+.booster-icon {
+    font-size: 1.8rem;
+    background: #fff;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1.5px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    border: 2px solid #8B4513;
+}
+
+.booster-count {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #fff;
+    background: #ff4500;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: -10px;
+    z-index: 2;
+    border: 1px solid #fff;
 }
 
 .goal-item {
@@ -989,109 +998,30 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* AVATAR */
 #avatar-container {
-    position: absolute;
-    bottom: 85px;
+    position: fixed;
+    bottom: 10px; /* Positionné tout en bas */
     left: 50%;
     transform: translateX(-50%);
-    width: 80px;
-    height: 80px;
-    z-index: 50;
+    width: 60px; /* Réduit de 80px à 60px */
+    height: 60px;
+    z-index: 2000;
     pointer-events: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    transition: transform 0.3s ease;
 }
 
 #avatar-body {
-    position: relative;
-    z-index: 2;
-    font-size: 3.5rem;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-/* New Limbs Container from JS */
-#avatar-limbs {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1; /* Behind face */
-}
-
-.avatar-arm, .avatar-leg {
-    position: absolute;
-    background: #FFD700;
-    border: 2px solid #DAA520;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.avatar-arm {
-    width: 12px;
-    height: 24px;
-    top: 35px;
-}
-
-.avatar-arm.left {
-    left: -8px; /* Adjusted relative to body center */
-    transform: rotate(20deg);
-    animation: waveLeft 2s infinite ease-in-out;
-}
-
-.avatar-arm.right {
-    right: -8px;
-    transform: rotate(-20deg);
-    animation: waveRight 2s infinite ease-in-out;
-}
-
-.avatar-leg {
-    width: 14px;
-    height: 20px;
-    bottom: -10px; /* Below face */
-    background: #8B4513;
-    border-color: #5D4037;
-}
-
-.avatar-leg.left {
-    left: 15px;
-    transform: rotate(5deg);
-}
-
-.avatar-leg.right {
-    right: 15px;
-    transform: rotate(-5deg);
-}
-
-#avatar-plate {
-    position: absolute;
-    bottom: 0;
-    width: 60px;
-    height: 10px;
-    background: rgba(0,0,0,0.2);
+    background: #8B4513; /* Peau */
     border-radius: 50%;
-    filter: blur(4px);
-    z-index: 0;
-}
-
-/* Animations for Limbs */
-@keyframes waveLeft {
-    0%, 100% { transform: rotate(20deg) translateY(0); }
-    50% { transform: rotate(35deg) translateY(-2px); }
-}
-
-@keyframes waveRight {
-    0%, 100% { transform: rotate(-20deg) translateY(0); }
-    50% { transform: rotate(-35deg) translateY(-2px); }
+    position: relative;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
 .avatar-face {
-    /* Kept for JS compatibility */
-    display: block;
+    font-size: 35px; /* Réduit */
+    text-align: center;
+    line-height: 60px; /* Centré verticalement */
 }
 
 .avatar-happy #avatar-body { animation: bounce 0.6s infinite; }

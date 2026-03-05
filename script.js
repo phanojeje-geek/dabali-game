@@ -35,9 +35,198 @@ const STORAGE_KEYS = {
 
 // ... (Existing code)
 
-// PERSISTENCE & JUICY EFFECTS
+// BOOSTERS LOGIC
+let activeBooster = null; // 'hammer', 'swap', or null
+let swapSourceTile = null;
 
-function saveGameState() {
+function activateBooster(type) {
+    if (activeBooster === type) {
+        activeBooster = null; // Deactivate if clicked again
+        swapSourceTile = null;
+        updateBoostersUI();
+        return;
+    }
+    
+    if (type === 'shuffle') {
+        if (getBoosterCount('shuffle') > 0) {
+            useBooster('shuffle');
+            shuffleGrid();
+            vibrate(50);
+        }
+        return;
+    }
+
+    if (getBoosterCount(type) > 0) {
+        activeBooster = type;
+        swapSourceTile = null;
+        updateBoostersUI();
+        vibrate(50);
+        
+        // Show hint
+        const msg = type === 'hammer' ? 'Touche une case pour la casser !' : 'Touche deux cases pour échanger !';
+        showToast(msg);
+    }
+}
+
+function handleBoosterInput(tile) {
+    if (!activeBooster) return false;
+
+    if (activeBooster === 'hammer') {
+        // Break tile logic
+        destroyTile(tile);
+        useBooster('hammer');
+        activeBooster = null;
+        updateBoostersUI();
+        return true;
+    }
+
+    if (activeBooster === 'swap') {
+        if (!swapSourceTile) {
+            swapSourceTile = tile;
+            tile.el.classList.add('selected');
+            return true;
+        } else {
+            // Perform swap
+            swapTiles(swapSourceTile, tile).then(() => {
+                // Check matches after swap (optional for booster? Usually yes)
+                // For a "Hand" booster, usually it doesn't use a move but allows swap without match
+                // Here we allow swap anywhere.
+                swapSourceTile.el.classList.remove('selected');
+                swapSourceTile = null;
+                useBooster('swap');
+                activeBooster = null;
+                updateBoostersUI();
+                resolveMatchesLoop(); // Trigger matches if any
+            });
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getBoosterCount(type) {
+    // Mock counts for now, could be stored in localStorage
+    return 5; 
+}
+
+function useBooster(type) {
+    // Decrease count logic
+    console.log(`Used booster: ${type}`);
+    // updateBoosterCount(type, getBoosterCount(type) - 1);
+}
+
+function updateBoostersUI() {
+    const boosters = document.querySelectorAll('.booster-item');
+    boosters.forEach(b => {
+        b.classList.remove('active');
+        if (activeBooster === 'hammer' && b.title === 'Marteau') b.classList.add('active');
+        if (activeBooster === 'swap' && b.title === 'Main') b.classList.add('active');
+    });
+}
+
+function destroyTile(tile) {
+    if (!tile) return;
+    
+    // Create explosion effect
+    const rect = tile.el.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    // Particle effect
+    for (let i = 0; i < 8; i++) {
+        const p = document.createElement('div');
+        p.style.position = 'fixed';
+        p.style.left = centerX + 'px';
+        p.style.top = centerY + 'px';
+        p.style.width = '10px';
+        p.style.height = '10px';
+        p.style.background = 'gold';
+        p.style.borderRadius = '50%';
+        p.style.pointerEvents = 'none';
+        p.style.zIndex = '9999';
+        document.body.appendChild(p);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 30;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist;
+        
+        p.animate([
+            { transform: 'translate(0,0) scale(1)', opacity: 1 },
+            { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+        ], { duration: 400, easing: 'ease-out' }).onfinish = () => p.remove();
+    }
+    
+    // Destroy logic
+    // We treat it as a match of 1 for the purpose of removing it
+    matches.add(tile);
+    score += 50; // Bonus points for hammering
+    updateUI();
+    
+    soundManager.playImpact();
+    resolveMatchesLoop();
+}
+
+function shuffleGrid() {
+    // Collect all current tiles
+    let allTiles = [];
+    for(let r=0; r<GRID_SIZE; r++) {
+        for(let c=0; c<GRID_SIZE; c++) {
+            if(grid[r][c] && !isObstacleId(grid[r][c].type.id)) {
+                allTiles.push(grid[r][c].type);
+            }
+        }
+    }
+    
+    // Shuffle types
+    for (let i = allTiles.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allTiles[i], allTiles[j]] = [allTiles[j], allTiles[i]];
+    }
+    
+    // Reassign
+    let idx = 0;
+    for(let r=0; r<GRID_SIZE; r++) {
+        for(let c=0; c<GRID_SIZE; c++) {
+            if(grid[r][c] && !isObstacleId(grid[r][c].type.id)) {
+                grid[r][c].type = allTiles[idx++];
+                renderTileContent(grid[r][c].el, grid[r][c].type);
+                // Animation
+                grid[r][c].el.animate([
+                    { transform: 'scale(0) rotate(180deg)' },
+                    { transform: 'scale(1) rotate(0deg)' }
+                ], { duration: 400 });
+            }
+        }
+    }
+    
+    soundManager.playPromoSuccess(); // Use as shuffle sound
+    resolveMatchesLoop(); // Check if shuffle created matches
+}
+
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.innerText = msg;
+    t.style.position = 'fixed';
+    t.style.top = '20%';
+    t.style.left = '50%';
+    t.style.transform = 'translate(-50%, -50%)';
+    t.style.background = 'rgba(0,0,0,0.8)';
+    t.style.color = '#fff';
+    t.style.padding = '10px 20px';
+    t.style.borderRadius = '20px';
+    t.style.zIndex = '5000';
+    t.style.pointerEvents = 'none';
+    document.body.appendChild(t);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.5s';
+        setTimeout(() => t.remove(), 500);
+    }, 2000);
+}
+
+// ... Existing Code ...
     if (moves <= 0 || timeRemaining <= 0) {
         localStorage.removeItem(STORAGE_KEYS.gameState);
         return;
@@ -779,6 +968,81 @@ const ambientManager = {
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const soundCtx = new AudioContext();
 
+// Simple Synthesizer for African Ambient Music
+const ambientSynth = {
+    ctx: soundCtx,
+    nodes: [],
+    isPlaying: false,
+    tempo: 120,
+    
+    playNote: function(freq, time, duration, vol=0.1) {
+        if(!isMusicOn) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'triangle'; // Softer sound
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(vol, time + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(time);
+        osc.stop(time + duration + 0.1);
+        this.nodes.push(osc);
+    },
+    
+    playPercussion: function(time) {
+        if(!isMusicOn) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.frequency.value = 150;
+        osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+        gain.gain.setValueAtTime(0.3, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(time);
+        osc.stop(time + 0.1);
+        this.nodes.push(osc);
+    },
+    
+    startLoop: function() {
+        if(this.isPlaying) return;
+        this.isPlaying = true;
+        this.schedule(this.ctx.currentTime + 0.1);
+    },
+    
+    schedule: function(startTime) {
+        if(!this.isPlaying) return;
+        
+        const beatLen = 60 / this.tempo;
+        // Simple 4/4 Afrobeat pattern
+        // Percussion on 1, 2&, 4
+        this.playPercussion(startTime);
+        this.playPercussion(startTime + beatLen * 1.5);
+        this.playPercussion(startTime + beatLen * 3);
+        
+        // Melody (Pentatonic: C D E G A)
+        const scale = [261.63, 293.66, 329.63, 392.00, 440.00];
+        const note = scale[Math.floor(Math.random() * scale.length)];
+        
+        if(Math.random() > 0.3) {
+            this.playNote(note, startTime, beatLen * 0.5);
+        }
+        if(Math.random() > 0.5) {
+            this.playNote(scale[Math.floor(Math.random()*scale.length)], startTime + beatLen * 2, beatLen * 0.5);
+        }
+
+        setTimeout(() => this.schedule(startTime + beatLen * 4), (beatLen * 4 * 1000) - 50);
+    },
+    
+    stop: function() {
+        this.isPlaying = false;
+        this.nodes.forEach(n => { try{n.stop()}catch(e){} });
+        this.nodes = [];
+    }
+};
+
 const soundManager = {
     playTone: (freq, type, duration) => {
         if (!isSoundOn) return;
@@ -1220,7 +1484,12 @@ function initGame() {
                 soundManager.playWin(); // Welcome sound
                 
                 // Check for saved game state first
-                const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
+        if (isMusicOn) {
+            // Start ambient music
+            setTimeout(() => ambientSynth.startLoop(), 1000);
+        }
+
+        const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
                 let resumed = false;
                 if (savedStateRaw) {
                     try {
@@ -1320,9 +1589,11 @@ function initGame() {
                 isMusicOn = musicToggle.checked;
                 localStorage.setItem(STORAGE_KEYS.music, isMusicOn ? 'on' : 'off');
                 if (isMusicOn) {
-                    ambientSoundManager.play(ambientManager.currentTheme);
+                    // ambientSoundManager.play(ambientManager.currentTheme);
+                    ambientSynth.startLoop();
                 } else {
-                    ambientSoundManager.stop();
+                    // ambientSoundManager.stop();
+                    ambientSynth.stop();
                 }
             });
         }
@@ -1344,6 +1615,18 @@ function initGame() {
 
         const quitBtn = document.getElementById('quit-btn');
         if (quitBtn) quitBtn.addEventListener('click', quitGame);
+
+        // Booster Listeners
+        const boosterItems = document.querySelectorAll('.booster-item');
+        boosterItems.forEach(b => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent grid click
+                const title = b.getAttribute('title');
+                if (title === 'Marteau') activateBooster('hammer');
+                else if (title === 'Mélange') activateBooster('shuffle');
+                else if (title === 'Main') activateBooster('swap');
+            });
+        });
 
         if (promoCodeBtn && promoModalOverlay && promoCodeInput && promoSubmitBtn) {
             promoCodeBtn.addEventListener('click', () => {
@@ -1938,6 +2221,15 @@ let activeTile = null;
 function handleInputStart(e) {
     if (isProcessing || moves <= 0 || isPaused) return; // Added isPaused check
     
+    // Check booster active
+    if (activeBooster) {
+        const tile = getTileFromEl(e.target);
+        if (tile && handleBoosterInput(tile)) {
+            e.preventDefault();
+            return;
+        }
+    }
+
     resetHintTimer(); // Reset hint timer on interaction
     
     // Sound
@@ -2916,7 +3208,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Init Game Logic
-    const game = new DabaliGame();
-    game.init();
+        const boosterItems = document.querySelectorAll('.booster-item');
+        boosterItems.forEach(b => {
+            b.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent grid click
+                const title = b.getAttribute('title');
+                if (title === 'Marteau') activateBooster('hammer');
+                else if (title === 'Mélange') activateBooster('shuffle');
+                else if (title === 'Main') activateBooster('swap');
+            });
+        });
+
+        // Init Game Logic
+        const game = new DabaliGame();
+        game.init();
 });
