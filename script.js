@@ -1626,7 +1626,7 @@ async function checkSwapForMatch(r1, c1, r2, c2) {
     const t1 = grid[r1][c1];
     const t2 = grid[r2][c2];
     
-    if (isObstacleId(t1.type.id) || isObstacleId(t2.type.id)) return false;
+    if (!t1 || !t2 || isObstacleId(t1.type.id) || isObstacleId(t2.type.id)) return false;
 
     // Swap types temporarily
     const temp = t1.type;
@@ -1637,25 +1637,27 @@ async function checkSwapForMatch(r1, c1, r2, c2) {
     const hasMatch = checkMatchAt(r1, c1) || checkMatchAt(r2, c2);
     
     // Swap back
-    t2.type = t1.type;
-    t1.type = temp;
+    t1.type = t2.type;
+    t2.type = temp;
     
     return hasMatch;
 }
 
 function checkMatchAt(r, c) {
-    const typeId = grid[r][c].type.id;
+    const tile = grid[r][c];
+    if (!tile) return false;
+    const typeId = tile.type.id;
     
     // Horiz
     let hCount = 1;
-    let i = c - 1; while(i>=0 && grid[r][i].type.id === typeId) { hCount++; i--; }
-    i = c + 1; while(i<GRID_SIZE && grid[r][i].type.id === typeId) { hCount++; i++; }
+    let i = c - 1; while(i>=0 && grid[r][i] && grid[r][i].type.id === typeId) { hCount++; i--; }
+    i = c + 1; while(i<GRID_SIZE && grid[r][i] && grid[r][i].type.id === typeId) { hCount++; i++; }
     if (hCount >= 3) return true;
     
     // Vert
     let vCount = 1;
-    i = r - 1; while(i>=0 && grid[i][c].type.id === typeId) { vCount++; i--; }
-    i = r + 1; while(i<GRID_SIZE && grid[i][c].type.id === typeId) { vCount++; i++; }
+    i = r - 1; while(i>=0 && grid[i][c] && grid[i][c].type.id === typeId) { vCount++; i--; }
+    i = r + 1; while(i<GRID_SIZE && grid[i][c] && grid[i][c].type.id === typeId) { vCount++; i++; }
     if (vCount >= 3) return true;
     
     return false;
@@ -2094,7 +2096,8 @@ function findMatches() {
             ];
             positions.forEach(pos => {
                 if (pos.r >= 0 && pos.r < GRID_SIZE && pos.c >= 0 && pos.c < GRID_SIZE) {
-                    matches.add(grid[pos.r][pos.c]);
+                    const neighbor = grid[pos.r][pos.c];
+                    if (neighbor) matches.add(neighbor);
                 }
             });
         });
@@ -2105,12 +2108,14 @@ function findMatches() {
         const center = run[Math.floor(run.length / 2)];
         if (orientation === 'row' || cross) {
             for (let c = 0; c < GRID_SIZE; c++) {
-                matches.add(grid[center.r][c]);
+                const t = grid[center.r][c];
+                if (t) matches.add(t);
             }
         }
         if (orientation === 'col' || cross) {
             for (let r = 0; r < GRID_SIZE; r++) {
-                matches.add(grid[r][center.c]);
+                const t = grid[r][center.c];
+                if (t) matches.add(t);
             }
         }
     };
@@ -2252,20 +2257,19 @@ function causesMatch(r, c, typeId, currentRow) {
     if (c >= 2) {
         const t1 = currentRow[c-1];
         const t2 = currentRow[c-2];
-        if (t1.type.id === typeId && t2.type.id === typeId) return true;
+        if (t1 && t2 && t1.type.id === typeId && t2.type.id === typeId) return true;
         
         // Check Recipe Horizontal (potential)
-        // t2, t1, current
-        if (checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
+        if (t1 && t2 && checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
     }
     // Check Vertical (Up)
     if (r >= 2) {
         const t1 = grid[r-1][c];
         const t2 = grid[r-2][c];
-        if (t1.type.id === typeId && t2.type.id === typeId) return true;
+        if (t1 && t2 && t1.type.id === typeId && t2.type.id === typeId) return true;
         
         // Check Recipe Vertical
-        if (checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
+        if (t1 && t2 && checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
     }
     return false;
 }
@@ -2380,6 +2384,7 @@ async function processMatches(matches) {
     await new Promise(r => setTimeout(r, 300));
     
     // 2. Refill (Gravity)
+    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
     const layout = levelConfig.layout;
 
     for (let c = 0; c < GRID_SIZE; c++) {
@@ -2387,14 +2392,14 @@ async function processMatches(matches) {
         let stayingTypes = [];
         for (let r = GRID_SIZE - 1; r >= 0; r--) {
             const tile = grid[r][c];
-            if (tile && !matches.includes(tile)) {
+            const isHole = layout && layout[r] && layout[r][c] === 0;
+            if (!isHole && tile && !matches.includes(tile)) {
                 stayingTypes.push(tile.type);
             }
         }
 
         // Fill slots from bottom to top
         let stayingIdx = 0;
-        let addedInCol = 0;
         for (let r = GRID_SIZE - 1; r >= 0; r--) {
             const isHole = layout && layout[r] && layout[r][c] === 0;
             if (isHole) continue;
@@ -2404,7 +2409,6 @@ async function processMatches(matches) {
             } else {
                 // New tile
                 grid[r][c].type = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
-                addedInCol++;
                 
                 // Drop animation for new tiles
                 grid[r][c].el.classList.remove('drop-anim');

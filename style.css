@@ -296,15 +296,18 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 }
 
 .header-main {
-    display: grid;
-    grid-template-columns: 1fr 60px 80px;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
+    width: 100%;
 }
 
 .progress-container {
+    flex-grow: 1;
     position: relative;
     padding: 10px 0;
+    max-width: 50%;
 }
 
 .stars-markers {
@@ -319,10 +322,12 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 
 .stars-markers i {
     position: absolute;
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.5);
-    transform: translateY(-50%);
+    font-size: 1rem;
+    color: rgba(255,255,255,0.8);
+    transform: translate(-50%, -50%);
     top: 50%;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    z-index: 3;
 }
 
 .marker-1 { left: 33%; }
@@ -354,10 +359,11 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 
 .moves-container, .score-container {
     background: rgba(255,255,255,0.2);
-    padding: 5px;
+    padding: 4px 8px;
     border-radius: 12px;
     text-align: center;
     border: 1px solid rgba(255,255,255,0.3);
+    min-width: 50px;
 }
 
 .moves-label, .score-label {
@@ -396,21 +402,22 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 }
 
 #game-board {
-    display: grid;
-    grid-gap: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     background: #D2B48C url('assets/splash.jpg') center/cover no-repeat;
     border: 8px solid #8B4513;
     border-radius: 15px;
     box-shadow: 
         0 10px 20px rgba(0,0,0,0.4),
         inset 0 0 20px rgba(0,0,0,0.3);
-    overflow: visible; /* Changed from hidden to visible for 3D effects */
+    overflow: hidden;
     box-sizing: border-box;
-    padding: 5px;
+    padding: 8px;
     touch-action: none;
     position: relative;
     width: fit-content;
-    max-width: 100%;
+    max-width: 95vw;
     margin: 10px auto;
     align-self: center;
     /* 3D Transform */
@@ -419,7 +426,6 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     transition: transform 0.5s ease;
 }
 
-/* Inner grid that holds the tiles */
 #grid {
     display: grid;
     grid-template-columns: repeat(8, var(--tile-size, 40px));
@@ -427,9 +433,11 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     gap: 4px;
     justify-content: center;
     align-content: center;
-    margin: 6px auto 10px auto;
+    margin: 0;
     width: fit-content;
-    max-width: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 5px;
+    border-radius: 10px;
 }
 
 /* Tip banner inside the board */
@@ -644,20 +652,23 @@ body.theme-cocody #game-board {
 #footer {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 15px;
-    background: linear-gradient(to top, rgba(0,0,0,0.1) 0%, transparent 100%);
+    gap: 5px;
+    padding: 10px;
+    background: linear-gradient(to top, rgba(0,0,0,0.1), transparent);
     z-index: 100;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #footer-goals {
     display: flex;
     justify-content: center;
-    gap: 15px;
-    background: rgba(255,255,255,0.2);
-    padding: 10px;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.3);
+    gap: 10px;
+    background: rgba(255,255,255,0.3);
+    padding: 8px;
+    border-radius: 15px;
+    border: 1px solid rgba(255,255,255,0.4);
+    backdrop-filter: blur(5px);
 }
 
 .boosters-container {
@@ -713,11 +724,10 @@ body.theme-cocody #game-board {
     flex-direction: column;
     align-items: center;
     background: white;
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 10px;
-    box-shadow: 0 3px 5px rgba(0,0,0,0.1);
-    min-width: 50px;
-    transition: background 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    min-width: 60px;
 }
 
 .goal-item.completed {
