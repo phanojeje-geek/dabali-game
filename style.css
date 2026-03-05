@@ -983,6 +983,10 @@ input:checked + .slider:before { transform: translateX(26px); }
     animation: pulse 1s infinite;
 }
 
+#start-btn.hidden {
+    display: none;
+}
+
 /* AVATAR */
 #avatar-container {
     position: absolute;

@@ -1071,59 +1071,19 @@ function showAdForLevel(completedLevel) {
     };
 }
 
-// DOM Elements
-const gridEl = document.getElementById('grid');
-const scoreEl = document.getElementById('score-display');
-const movesEl = document.getElementById('moves-display');
-const comboMsg = document.getElementById('combo-message');
-const modalOverlay = document.getElementById('modal-overlay');
-const modalBtn = document.getElementById('modal-btn');
-const footerGoalsEl = document.getElementById('footer-goals');
-const timerEl = document.getElementById('timer-display');
-const nameModalOverlay = document.getElementById('name-modal-overlay');
-const playerNameInput = document.getElementById('player-name-input');
-const startGameBtn = document.getElementById('start-game-btn');
-const tutorialOverlay = document.getElementById('tutorial-overlay');
-const tutorialOkBtn = document.getElementById('tutorial-ok-btn');
-const levelGroupEl = document.getElementById('level-group-display');
-const promoModalOverlay = document.getElementById('promo-modal-overlay');
-const promoCodeInput = document.getElementById('promo-code-input');
-const promoSubmitBtn = document.getElementById('promo-submit-btn');
-const promoMessageEl = document.getElementById('promo-message');
-const adModalOverlay = document.getElementById('ad-modal-overlay');
-const adPartnerNameEl = document.getElementById('ad-partner-name');
-const adCodeHintEl = document.getElementById('ad-code-hint');
-const adCountdownEl = document.getElementById('ad-countdown');
-const adContinueBtn = document.getElementById('ad-continue-btn');
-const adCopyBtn = document.getElementById('ad-copy-btn');
-const levelSelectOverlay = document.getElementById('level-select-overlay');
-const levelGridEl = document.getElementById('level-grid');
-const levelSelectCloseBtn = document.getElementById('level-select-close');
-const gameBoardEl = document.getElementById('game-board');
-const gameContainerEl = document.getElementById('game-container');
-const headerEl = document.getElementById('header');
-// Menu Elements
-const btnMenu = document.getElementById('menu-btn');
-const drawerMenu = document.getElementById('drawer-menu');
-const drawerOverlay = document.getElementById('drawer-overlay');
-const closeDrawerBtn = document.getElementById('close-drawer');
-const openLevelMapBtn = document.getElementById('open-level-map');
-const promoCodeBtn = document.getElementById('promo-code-btn');
-const darkModeToggle = document.getElementById('dark-mode-toggle');
-const soundToggle = document.getElementById('sound-toggle');
-const musicToggle = document.getElementById('music-toggle');
-const vibrationToggle = document.getElementById('vibration-toggle');
-// Splash
-const splashScreen = document.getElementById('splash-screen');
-const startBtn = document.getElementById('start-btn');
-const progress = document.querySelector('.progress');
+// DOM Elements (assigned in initGame)
+let gridEl, scoreEl, movesEl, comboMsg, modalOverlay, modalBtn, footerGoalsEl, timerEl;
+let nameModalOverlay, playerNameInput, startGameBtn, tutorialOverlay, tutorialOkBtn;
+let levelGroupEl, promoModalOverlay, promoCodeInput, promoSubmitBtn, promoMessageEl;
+let adModalOverlay, adPartnerNameEl, adCodeHintEl, adCountdownEl, adContinueBtn, adCopyBtn;
+let levelSelectOverlay, levelGridEl, levelSelectCloseBtn, gameBoardEl, gameContainerEl, headerEl;
+let btnMenu, drawerMenu, drawerOverlay, closeDrawerBtn, openLevelMapBtn, promoCodeBtn;
+let darkModeToggle, soundToggle, musicToggle, vibrationToggle;
+let splashScreen, startBtn, progress;
 
 function updateTileSize() {
     try {
-        if (!gameBoardEl || !gameContainerEl) {
-            console.warn("gameBoardEl or gameContainerEl not found for updateTileSize");
-            return;
-        }
+        if (!gameBoardEl || !gameContainerEl) return;
         
         const headerHeight = headerEl ? headerEl.offsetHeight : 0;
         const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
@@ -1160,283 +1120,321 @@ function updateTileSize() {
 function initGame() {
     console.log("Dabali Game v1.11 - Init Started");
     
-    // 1. Splash Logic FIRST (ensure it's not blocked by other logic)
-    const splashScreen = document.getElementById('splash-screen');
-    const startBtn = document.getElementById('start-btn');
-    const progress = document.querySelector('.progress');
-
-    if (progress) {
-        setTimeout(() => {
-            progress.style.width = '100%';
-        }, 100);
-    }
-
-    if (startBtn) {
-        setTimeout(() => {
-            startBtn.classList.remove('hidden');
-        }, 1500); // Reduced slightly for better feel
-
-        startBtn.addEventListener('click', () => {
-            if (splashScreen) {
-                splashScreen.style.opacity = '0';
-                setTimeout(() => {
-                    splashScreen.classList.add('hidden');
-                    // Show Name Modal after Splash
-                    if (nameModalOverlay) {
-                        nameModalOverlay.classList.remove('hidden');
-                        nameModalOverlay.classList.add('active');
-                        if (playerNameInput) playerNameInput.focus();
-                    }
-                }, 500);
-            }
-        });
-    }
+    // 1. Assign DOM Elements
+    gridEl = document.getElementById('grid');
+    scoreEl = document.getElementById('score-display');
+    movesEl = document.getElementById('moves-display');
+    comboMsg = document.getElementById('combo-message');
+    modalOverlay = document.getElementById('modal-overlay');
+    modalBtn = document.getElementById('modal-btn');
+    footerGoalsEl = document.getElementById('footer-goals');
+    timerEl = document.getElementById('timer-display');
+    nameModalOverlay = document.getElementById('name-modal-overlay');
+    playerNameInput = document.getElementById('player-name-input');
+    startGameBtn = document.getElementById('start-game-btn');
+    tutorialOverlay = document.getElementById('tutorial-overlay');
+    tutorialOkBtn = document.getElementById('tutorial-ok-btn');
+    levelGroupEl = document.getElementById('level-group-display');
+    promoModalOverlay = document.getElementById('promo-modal-overlay');
+    promoCodeInput = document.getElementById('promo-code-input');
+    promoSubmitBtn = document.getElementById('promo-submit-btn');
+    promoMessageEl = document.getElementById('promo-message');
+    adModalOverlay = document.getElementById('ad-modal-overlay');
+    adPartnerNameEl = document.getElementById('ad-partner-name');
+    adCodeHintEl = document.getElementById('ad-code-hint');
+    adCountdownEl = document.getElementById('ad-countdown');
+    adContinueBtn = document.getElementById('ad-continue-btn');
+    adCopyBtn = document.getElementById('ad-copy-btn');
+    levelSelectOverlay = document.getElementById('level-select-overlay');
+    levelGridEl = document.getElementById('level-grid');
+    levelSelectCloseBtn = document.getElementById('level-select-close');
+    gameBoardEl = document.getElementById('game-board');
+    gameContainerEl = document.getElementById('game-container');
+    headerEl = document.getElementById('header');
+    btnMenu = document.getElementById('menu-btn');
+    drawerMenu = document.getElementById('drawer-menu');
+    drawerOverlay = document.getElementById('drawer-overlay');
+    closeDrawerBtn = document.getElementById('close-drawer');
+    openLevelMapBtn = document.getElementById('open-level-map');
+    promoCodeBtn = document.getElementById('promo-code-btn');
+    darkModeToggle = document.getElementById('dark-mode-toggle');
+    soundToggle = document.getElementById('sound-toggle');
+    musicToggle = document.getElementById('music-toggle');
+    vibrationToggle = document.getElementById('vibration-toggle');
+    splashScreen = document.getElementById('splash-screen');
+    startBtn = document.getElementById('start-btn');
+    progress = document.querySelector('.progress');
 
     try {
-        if (!document.getElementById('grid')) {
+        // 2. Splash Logic
+        if (progress) {
+            setTimeout(() => {
+                progress.style.width = '100%';
+            }, 100);
+        }
+
+        if (startBtn) {
+            setTimeout(() => {
+                startBtn.classList.remove('hidden');
+            }, 1000); // Fast show for JOUER
+
+            startBtn.addEventListener('click', () => {
+                if (splashScreen) {
+                    splashScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        splashScreen.classList.add('hidden');
+                        // Show Name Modal after Splash
+                        if (nameModalOverlay) {
+                            nameModalOverlay.classList.remove('hidden');
+                            nameModalOverlay.classList.add('active');
+                            if (playerNameInput) playerNameInput.focus();
+                        }
+                    }, 500);
+                }
+            });
+        }
+
+        if (!gridEl) {
             console.error("FATAL: #grid element not found in DOM!");
         }
         
         updateTileSize();
         window.addEventListener('resize', updateTileSize);
         window.addEventListener('orientationchange', updateTileSize);
-
-    const savedTheme = localStorage.getItem(STORAGE_KEYS.theme);
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        if (darkModeToggle) darkModeToggle.checked = true;
+    } catch (e) {
+        console.error("Error during basic init:", e);
     }
 
-    const savedSound = localStorage.getItem(STORAGE_KEYS.sound);
-    if (savedSound) {
-        isSoundOn = savedSound === 'on';
-        if (soundToggle) soundToggle.checked = isSoundOn;
-    }
-
-    const savedVibration = localStorage.getItem(STORAGE_KEYS.vibration);
-    if (savedVibration) {
-        isVibrationOn = savedVibration === 'on';
-        if (vibrationToggle) vibrationToggle.checked = isVibrationOn;
-    }
-
-    const savedName = localStorage.getItem(STORAGE_KEYS.playerName);
-    if (savedName) {
-        playerName = savedName;
-        if (playerNameInput) playerNameInput.value = savedName;
-    }
-
-    // Name Modal Logic
-    if (startGameBtn) {
-        startGameBtn.addEventListener('click', () => {
-            const name = playerNameInput ? playerNameInput.value.trim() : '';
-            if (name) {
-                playerName = name;
-                localStorage.setItem(STORAGE_KEYS.playerName, playerName);
-            }
-            if (nameModalOverlay) {
-                nameModalOverlay.classList.remove('active');
-                setTimeout(() => {
-                    nameModalOverlay.classList.add('hidden');
-                }, 300);
-            }
-            soundManager.playWin(); // Welcome sound
-            
-            // Check for saved game state first
-            const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
-            let resumed = false;
-            if (savedStateRaw) {
-                try {
-                    const state = JSON.parse(savedStateRaw);
-                    if (state.level && state.moves > 0 && state.timeRemaining > 0) {
-                         // Show Resume Modal
-                         const resumeOverlay = document.createElement('div');
-                         resumeOverlay.className = 'modal-overlay active';
-                         resumeOverlay.style.zIndex = '3000';
-                         resumeOverlay.innerHTML = `
-                            <div class="modal-content" style="background: rgba(20,20,20,0.95); border: 2px solid #FFD700;">
-                                <h2 style="color:#FFD700; font-size:1.8rem;">Partie en cours</h2>
-                                <p style="margin:20px 0; font-size:1.1rem;">Une partie sauvegardée a été trouvée (Niveau ${state.level}).</p>
-                                <p style="margin-bottom:20px;">Score: ${state.score}</p>
-                                <div class="modal-buttons" style="display:flex; gap:15px; justify-content:center;">
-                                    <button id="resume-yes-btn" class="modal-btn" style="background:#4CAF50; border:none;">Reprendre</button>
-                                    <button id="resume-no-btn" class="modal-btn" style="background:#f44336; border:none;">Nouvelle Partie</button>
-                                </div>
-                            </div>
-                         `;
-                         document.body.appendChild(resumeOverlay);
-                         
-                         document.getElementById('resume-yes-btn').onclick = () => {
-                             resumeOverlay.remove();
-                             level = state.level;
-                             startLevel(level, true);
-                         };
-                         
-                         document.getElementById('resume-no-btn').onclick = () => {
-                             resumeOverlay.remove();
-                             clearSavedGame();
-                             openLevelSelect();
-                         };
-                         resumed = true; // Handled by modal logic
-                    }
-                } catch(e) {
-                    console.error("Error checking saved state", e);
-                }
-            }
-
-            if (!resumed) {
-                const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
-                const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
-                level = initialLevel;
-                const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
-                const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
-                
-                if (maxUnlocked <= 1 && level === 1 && tutorialOverlay) {
-                    tutorialOverlay.classList.remove('hidden');
-                    tutorialOverlay.classList.add('active');
-                } else {
-                    openLevelSelect();
-                }
-            }
-        });
-    }
-
-    // Menu Logic
-    if (btnMenu) btnMenu.addEventListener('click', openDrawer);
-    if (closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeDrawer);
-    if (drawerOverlay) drawerOverlay.addEventListener('click', closeDrawer);
-    if (openLevelMapBtn) {
-        openLevelMapBtn.addEventListener('click', () => {
-            closeDrawer();
-            openLevelSelect();
-        });
-    }
-    
-    // Dark Mode
-    if (darkModeToggle) {
-        darkModeToggle.addEventListener('change', () => {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem(
-                STORAGE_KEYS.theme,
-                document.body.classList.contains('dark-mode') ? 'dark' : 'light'
-            );
-        });
-    }
-
-    if (soundToggle) {
-        soundToggle.addEventListener('change', () => {
-            isSoundOn = soundToggle.checked;
-            localStorage.setItem(STORAGE_KEYS.sound, isSoundOn ? 'on' : 'off');
-        });
-    }
-
-    if (musicToggle) {
-        const savedMusic = localStorage.getItem(STORAGE_KEYS.music);
-        if (savedMusic) {
-            isMusicOn = savedMusic === 'on';
-        } else {
-            isMusicOn = true;
+    try {
+        const savedTheme = localStorage.getItem(STORAGE_KEYS.theme);
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            if (darkModeToggle) darkModeToggle.checked = true;
         }
-        musicToggle.checked = isMusicOn;
+
+        const savedSound = localStorage.getItem(STORAGE_KEYS.sound);
+        if (savedSound) {
+            isSoundOn = savedSound === 'on';
+            if (soundToggle) soundToggle.checked = isSoundOn;
+        }
+
+        const savedVibration = localStorage.getItem(STORAGE_KEYS.vibration);
+        if (savedVibration) {
+            isVibrationOn = savedVibration === 'on';
+            if (vibrationToggle) vibrationToggle.checked = isVibrationOn;
+        }
+
+        const savedName = localStorage.getItem(STORAGE_KEYS.playerName);
+        if (savedName) {
+            playerName = savedName;
+            if (playerNameInput) playerNameInput.value = savedName;
+        }
+
+        // Name Modal Logic
+        if (startGameBtn) {
+            startGameBtn.addEventListener('click', () => {
+                const name = playerNameInput ? playerNameInput.value.trim() : '';
+                if (name) {
+                    playerName = name;
+                    localStorage.setItem(STORAGE_KEYS.playerName, playerName);
+                }
+                if (nameModalOverlay) {
+                    nameModalOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        nameModalOverlay.classList.add('hidden');
+                    }, 300);
+                }
+                soundManager.playWin(); // Welcome sound
+                
+                // Check for saved game state first
+                const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
+                let resumed = false;
+                if (savedStateRaw) {
+                    try {
+                        const state = JSON.parse(savedStateRaw);
+                        if (state.level && state.moves > 0 && state.timeRemaining > 0) {
+                             // Show Resume Modal
+                             const resumeOverlay = document.createElement('div');
+                             resumeOverlay.className = 'modal-overlay active';
+                             resumeOverlay.style.zIndex = '3000';
+                             resumeOverlay.innerHTML = `
+                                <div class="modal-content" style="background: rgba(20,20,20,0.95); border: 2px solid #FFD700;">
+                                    <h2 style="color:#FFD700; font-size:1.8rem;">Partie en cours</h2>
+                                    <p style="margin:20px 0; font-size:1.1rem;">Une partie sauvegardée a été trouvée (Niveau ${state.level}).</p>
+                                    <p style="margin-bottom:20px;">Score: ${state.score}</p>
+                                    <div class="modal-buttons" style="display:flex; gap:15px; justify-content:center;">
+                                        <button id="resume-yes-btn" class="modal-btn" style="background:#4CAF50; border:none;">Reprendre</button>
+                                        <button id="resume-no-btn" class="modal-btn" style="background:#f44336; border:none;">Nouvelle Partie</button>
+                                    </div>
+                                </div>
+                             `;
+                             document.body.appendChild(resumeOverlay);
+                             
+                             document.getElementById('resume-yes-btn').onclick = () => {
+                                 resumeOverlay.remove();
+                                 level = state.level;
+                                 startLevel(level, true);
+                             };
+                             
+                             document.getElementById('resume-no-btn').onclick = () => {
+                                 resumeOverlay.remove();
+                                 clearSavedGame();
+                                 openLevelSelect();
+                             };
+                             resumed = true; // Handled by modal logic
+                        }
+                    } catch(e) {
+                        console.error("Error checking saved state", e);
+                    }
+                }
+
+                if (!resumed) {
+                    const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
+                    const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
+                    level = initialLevel;
+                    const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
+                    const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
+                    
+                    if (maxUnlocked <= 1 && level === 1 && tutorialOverlay) {
+                        tutorialOverlay.classList.remove('hidden');
+                        tutorialOverlay.classList.add('active');
+                    } else {
+                        openLevelSelect();
+                    }
+                }
+            });
+        }
+
+        // Menu Logic
+        if (btnMenu) btnMenu.addEventListener('click', openDrawer);
+        if (closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeDrawer);
+        if (drawerOverlay) drawerOverlay.addEventListener('click', closeDrawer);
+        if (openLevelMapBtn) {
+            openLevelMapBtn.addEventListener('click', () => {
+                closeDrawer();
+                openLevelSelect();
+            });
+        }
         
-        musicToggle.addEventListener('change', () => {
-            isMusicOn = musicToggle.checked;
-            localStorage.setItem(STORAGE_KEYS.music, isMusicOn ? 'on' : 'off');
-            if (isMusicOn) {
-                ambientSoundManager.play(ambientManager.currentTheme);
+        // Dark Mode
+        if (darkModeToggle) {
+            darkModeToggle.addEventListener('change', () => {
+                document.body.classList.toggle('dark-mode');
+                localStorage.setItem(
+                    STORAGE_KEYS.theme,
+                    document.body.classList.contains('dark-mode') ? 'dark' : 'light'
+                );
+            });
+        }
+
+        if (soundToggle) {
+            soundToggle.addEventListener('change', () => {
+                isSoundOn = soundToggle.checked;
+                localStorage.setItem(STORAGE_KEYS.sound, isSoundOn ? 'on' : 'off');
+            });
+        }
+
+        if (musicToggle) {
+            const savedMusic = localStorage.getItem(STORAGE_KEYS.music);
+            if (savedMusic) {
+                isMusicOn = savedMusic === 'on';
             } else {
-                ambientSoundManager.stop();
+                isMusicOn = true;
             }
-        });
-    }
+            musicToggle.checked = isMusicOn;
+            
+            musicToggle.addEventListener('change', () => {
+                isMusicOn = musicToggle.checked;
+                localStorage.setItem(STORAGE_KEYS.music, isMusicOn ? 'on' : 'off');
+                if (isMusicOn) {
+                    ambientSoundManager.play(ambientManager.currentTheme);
+                } else {
+                    ambientSoundManager.stop();
+                }
+            });
+        }
 
-    if (vibrationToggle) {
-        vibrationToggle.addEventListener('change', () => {
-            isVibrationOn = vibrationToggle.checked;
-            localStorage.setItem(STORAGE_KEYS.vibration, isVibrationOn ? 'on' : 'off');
-        });
-    }
+        if (vibrationToggle) {
+            vibrationToggle.addEventListener('change', () => {
+                isVibrationOn = vibrationToggle.checked;
+                localStorage.setItem(STORAGE_KEYS.vibration, isVibrationOn ? 'on' : 'off');
+            });
+        }
 
-    const savedFreeSuper = parseInt(localStorage.getItem(STORAGE_KEYS.freeSuperCombos), 10);
-    if (Number.isFinite(savedFreeSuper) && savedFreeSuper > 0) {
-        freeSuperCombos = savedFreeSuper;
-    }
+        const savedFreeSuper = parseInt(localStorage.getItem(STORAGE_KEYS.freeSuperCombos), 10);
+        if (Number.isFinite(savedFreeSuper) && savedFreeSuper > 0) {
+            freeSuperCombos = savedFreeSuper;
+        }
 
-    if (modalBtn) {
-        // Remove existing listeners to avoid duplicates if initGame is called multiple times
-        // actually initGame is window.onload so it's fine.
-        // We do NOT add a default listener here anymore.
-    }
-    // startLevel(1) is called after name input
-    
-    const pauseBtn = document.getElementById('pause-btn');
-    if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
+        const pauseBtn = document.getElementById('pause-btn');
+        if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
 
-    const quitBtn = document.getElementById('quit-btn');
-    if (quitBtn) quitBtn.addEventListener('click', quitGame);
+        const quitBtn = document.getElementById('quit-btn');
+        if (quitBtn) quitBtn.addEventListener('click', quitGame);
 
-    if (promoCodeBtn && promoModalOverlay && promoCodeInput && promoSubmitBtn) {
-        promoCodeBtn.addEventListener('click', () => {
-            promoMessageEl.innerText = '';
-            promoCodeInput.value = '';
-            promoModalOverlay.classList.remove('hidden');
-            promoModalOverlay.classList.add('active');
-            promoCodeInput.focus();
-        });
-        promoSubmitBtn.addEventListener('click', () => {
-            redeemPromoCode();
-        });
-        promoCodeInput.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
+        if (promoCodeBtn && promoModalOverlay && promoCodeInput && promoSubmitBtn) {
+            promoCodeBtn.addEventListener('click', () => {
+                promoMessageEl.innerText = '';
+                promoCodeInput.value = '';
+                promoModalOverlay.classList.remove('hidden');
+                promoModalOverlay.classList.add('active');
+                promoCodeInput.focus();
+            });
+            promoSubmitBtn.addEventListener('click', () => {
                 redeemPromoCode();
-            }
-        });
-    }
+            });
+            promoCodeInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    redeemPromoCode();
+                }
+            });
+        }
 
-    if (levelSelectCloseBtn) {
-        levelSelectCloseBtn.addEventListener('click', () => {
-            if (levelSelectOverlay) {
-                levelSelectOverlay.classList.remove('active');
-                setTimeout(() => {
-                    levelSelectOverlay.classList.add('hidden');
-                }, 300);
-            }
-        });
-    }
+        if (levelSelectCloseBtn) {
+            levelSelectCloseBtn.addEventListener('click', () => {
+                if (levelSelectOverlay) {
+                    levelSelectOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        levelSelectOverlay.classList.add('hidden');
+                    }, 300);
+                }
+            });
+        }
 
-    const avatarBody = document.getElementById('avatar-body');
-    if (avatarBody) {
-        avatarEl = document.createElement('div');
-        avatarEl.className = 'avatar-face';
-        avatarBody.appendChild(avatarEl);
-        avatarLimbsEl = document.createElement('div');
-        avatarLimbsEl.id = 'avatar-limbs';
-        const armLeft = document.createElement('div');
-        armLeft.className = 'avatar-arm left';
-        const armRight = document.createElement('div');
-        armRight.className = 'avatar-arm right';
-        const legLeft = document.createElement('div');
-        legLeft.className = 'avatar-leg left';
-        const legRight = document.createElement('div');
-        legRight.className = 'avatar-leg right';
-        avatarLimbsEl.appendChild(armLeft);
-        avatarLimbsEl.appendChild(armRight);
-        avatarLimbsEl.appendChild(legLeft);
-        avatarLimbsEl.appendChild(legRight);
-        avatarBody.appendChild(avatarLimbsEl);
-        setAvatarMood('neutral');
-    }
+        const avatarBody = document.getElementById('avatar-body');
+        if (avatarBody) {
+            avatarEl = document.createElement('div');
+            avatarEl.className = 'avatar-face';
+            avatarBody.appendChild(avatarEl);
+            avatarLimbsEl = document.createElement('div');
+            avatarLimbsEl.id = 'avatar-limbs';
+            const armLeft = document.createElement('div');
+            armLeft.className = 'avatar-arm left';
+            const armRight = document.createElement('div');
+            armRight.className = 'avatar-arm right';
+            const legLeft = document.createElement('div');
+            legLeft.className = 'avatar-leg left';
+            const legRight = document.createElement('div');
+            legRight.className = 'avatar-leg right';
+            avatarLimbsEl.appendChild(armLeft);
+            avatarLimbsEl.appendChild(armRight);
+            avatarLimbsEl.appendChild(legLeft);
+            avatarLimbsEl.appendChild(legRight);
+            avatarBody.appendChild(avatarLimbsEl);
+            setAvatarMood('neutral');
+        }
 
-    if (tutorialOkBtn) {
-        tutorialOkBtn.addEventListener('click', () => {
-            if (tutorialOverlay) {
-                tutorialOverlay.classList.remove('active');
-                setTimeout(() => {
-                    tutorialOverlay.classList.add('hidden');
-                }, 300);
-            }
-            openLevelSelect();
-        });
-    }
+        if (tutorialOkBtn) {
+            tutorialOkBtn.addEventListener('click', () => {
+                if (tutorialOverlay) {
+                    tutorialOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        tutorialOverlay.classList.add('hidden');
+                    }, 300);
+                }
+                openLevelSelect();
+            });
+        }
     } catch (e) {
         console.error("FATAL ERROR in initGame:", e);
     }
