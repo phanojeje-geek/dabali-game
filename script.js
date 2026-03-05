@@ -2534,15 +2534,15 @@ async function processMatches(matches) {
     await new Promise(r => setTimeout(r, 300));
     
     // 2. Refill (Gravity)
-    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
-    const layout = levelConfig.layout;
+    // Removed duplicate declaration of levelConfig
+    const currentLayout = (LEVELS.find(l => l.id === level) || LEVELS[0]).layout;
 
     for (let c = 0; c < GRID_SIZE; c++) {
         // Collect types that are staying in this column (not matches, not holes)
         let stayingTypes = [];
         for (let r = GRID_SIZE - 1; r >= 0; r--) {
             const tile = grid[r][c];
-            const isHole = layout && layout[r] && layout[r][c] === 0;
+            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
             if (!isHole && tile && !matches.includes(tile)) {
                 stayingTypes.push(tile.type);
             }
@@ -2551,7 +2551,7 @@ async function processMatches(matches) {
         // Fill slots from bottom to top
         let stayingIdx = 0;
         for (let r = GRID_SIZE - 1; r >= 0; r--) {
-            const isHole = layout && layout[r] && layout[r][c] === 0;
+            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
             if (isHole) continue;
 
             if (stayingIdx < stayingTypes.length) {
