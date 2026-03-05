@@ -977,15 +977,15 @@ const ambientSynth = {
     isPlaying: false,
     tempo: 120,
     
-    playNote: function(freq, time, duration, vol=0.1) {
+    playNote: function(freq, time, duration, vol=0.08) {
         if(!isMusicOn) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.frequency.value = freq;
-        osc.type = 'triangle'; // Softer sound
+        osc.type = 'sine'; // Changed from triangle to sine for pure tone
         gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(vol, time + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
+        gain.gain.linearRampToValueAtTime(vol, time + 0.01); // Faster attack (percussive)
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration); // Fast decay
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(time);
@@ -997,10 +997,10 @@ const ambientSynth = {
         if(!isMusicOn) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.frequency.value = 150;
-        osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
-        gain.gain.setValueAtTime(0.3, time);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(80, time + 0.05); // Faster drop
+        gain.gain.setValueAtTime(0.2, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); // Very short (woodblock style)
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(time);
@@ -1025,14 +1025,15 @@ const ambientSynth = {
         this.playPercussion(startTime + beatLen * 3);
         
         // Melody (Pentatonic: C D E G A)
+        // Adjusted to be less "wave-like" and more "marimba"
         const scale = [261.63, 293.66, 329.63, 392.00, 440.00];
         const note = scale[Math.floor(Math.random() * scale.length)];
         
         if(Math.random() > 0.3) {
-            this.playNote(note, startTime, beatLen * 0.5);
+            this.playNote(note, startTime, beatLen * 0.5, 0.08); // Reduced volume
         }
         if(Math.random() > 0.5) {
-            this.playNote(scale[Math.floor(Math.random()*scale.length)], startTime + beatLen * 2, beatLen * 0.5);
+            this.playNote(scale[Math.floor(Math.random()*scale.length)], startTime + beatLen * 2, beatLen * 0.5, 0.08);
         }
 
         setTimeout(() => this.schedule(startTime + beatLen * 4), (beatLen * 4 * 1000) - 50);
