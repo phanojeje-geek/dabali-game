@@ -1163,37 +1163,10 @@ function initGame() {
     vibrationToggle = document.getElementById('vibration-toggle');
     splashScreen = document.getElementById('splash-screen');
     startBtn = document.getElementById('start-btn');
-    progress = document.querySelector('.progress');
+    progress = document.getElementById('splash-progress');
 
     try {
-        // 2. Splash Logic
-        if (progress) {
-            setTimeout(() => {
-                progress.style.width = '100%';
-            }, 100);
-        }
-
-        if (startBtn) {
-            setTimeout(() => {
-                startBtn.classList.remove('hidden');
-            }, 1000); // Fast show for JOUER
-
-            startBtn.addEventListener('click', () => {
-                if (splashScreen) {
-                    splashScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        splashScreen.classList.add('hidden');
-                        // Show Name Modal after Splash
-                        if (nameModalOverlay) {
-                            nameModalOverlay.classList.remove('hidden');
-                            nameModalOverlay.classList.add('active');
-                            if (playerNameInput) playerNameInput.focus();
-                        }
-                    }, 500);
-                }
-            });
-        }
-
+        // 2. Splash Logic handled in DOMContentLoaded
         if (!gridEl) {
             console.error("FATAL: #grid element not found in DOM!");
         }
@@ -2908,7 +2881,42 @@ window.addEventListener('online', () => {
     }
 });
 
-window.onload = () => {
+document.addEventListener('DOMContentLoaded', () => {
+    // Re-bind Splash elements safely
+    splashScreen = document.getElementById('splash-screen');
+    startBtn = document.getElementById('start-btn');
+    const progress = document.getElementById('splash-progress');
+    
+    // Animate progress
+    if (progress) {
+        setTimeout(() => progress.style.width = '50%', 100);
+        setTimeout(() => progress.style.width = '100%', 500);
+    }
+
+    // Show button safely
+    if (startBtn) {
+        setTimeout(() => {
+            startBtn.style.display = 'block';
+            startBtn.classList.remove('hidden'); // Legacy
+        }, 1000);
+        
+        startBtn.onclick = () => {
+            if (splashScreen) {
+                splashScreen.style.opacity = '0';
+                setTimeout(() => {
+                    splashScreen.style.display = 'none';
+                    // Open Name Modal
+                    if (nameModalOverlay) {
+                        nameModalOverlay.classList.remove('hidden');
+                        nameModalOverlay.classList.add('active');
+                        if (playerNameInput) playerNameInput.focus();
+                    }
+                }, 500);
+            }
+        };
+    }
+
+    // Init Game Logic
     const game = new DabaliGame();
     game.init();
-};
+});
