@@ -814,6 +814,29 @@ const soundManager = {
         soundManager.playTone(550, 'square', 0.1);
         setTimeout(() => soundManager.playTone(750, 'square', 0.14), 90);
         setTimeout(() => soundManager.playTone(950, 'square', 0.16), 180);
+    },
+    playExplosion: () => {
+        if (!isSoundOn) return;
+        if (soundCtx.state === 'suspended') soundCtx.resume();
+        const bufferSize = soundCtx.sampleRate * 0.4;
+        const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize) * 0.5;
+        }
+        const source = soundCtx.createBufferSource();
+        source.buffer = buffer;
+        const gain = soundCtx.createGain();
+        gain.gain.setValueAtTime(0.15, soundCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, soundCtx.currentTime + 0.4);
+        source.connect(gain);
+        gain.connect(soundCtx.destination);
+        source.start();
+        // Add a low thump
+        soundManager.playTone(80, 'sine', 0.3);
+    },
+    playImpact: () => {
+        soundManager.playTone(150, 'square', 0.1);
     }
 };
 
@@ -2071,6 +2094,15 @@ function triggerSuperCombo() {
     vibrate([100, 50, 100, 50, 200]);
     showWouhEffect(); // Juicy WOUH effect
     
+    // Screen Shake
+    document.body.classList.remove('shake');
+    void document.body.offsetWidth;
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 400);
+    
+    // Play Sound
+    soundManager.playExplosion();
+    
     // Force restart timer if not paused to ensure it continues
     if (!isPaused) {
         startTimer();
@@ -2081,12 +2113,80 @@ function triggerSuperCombo() {
     }, 3000);
 }
 
+function triggerExplosionEffect(startTile, targetTiles) {
+    if (!startTile || !targetTiles || targetTiles.length === 0) return;
+    
+    const startRect = startTile.el.getBoundingClientRect();
+    const startX = startRect.left + startRect.width / 2;
+    const startY = startRect.top + startRect.height / 2;
+    
+    // 1. Center Glow
+    const glow = document.createElement('div');
+    glow.className = 'super-combo-glow';
+    glow.style.left = startX + 'px';
+    glow.style.top = startY + 'px';
+    document.body.appendChild(glow);
+    setTimeout(() => glow.remove(), 1000);
+    
+    // 2. Play Main Sound
+    soundManager.playExplosion();
+    
+    // 3. Shake Screen
+    document.body.classList.remove('shake');
+    void document.body.offsetWidth;
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 400);
+
+    // 4. Rays & Impacts
+    targetTiles.forEach((target, index) => {
+        if (!target || !target.el) return;
+        
+        setTimeout(() => {
+            const targetRect = target.el.getBoundingClientRect();
+            const targetX = targetRect.left + targetRect.width / 2;
+            const targetY = targetRect.top + targetRect.height / 2;
+            
+            // Create Ray
+            const ray = document.createElement('div');
+            ray.className = 'explosion-ray';
+            ray.style.left = startX + 'px';
+            ray.style.top = startY + 'px';
+            
+            const dist = Math.sqrt(Math.pow(targetX - startX, 2) + Math.pow(targetY - startY, 2));
+            const angle = Math.atan2(targetY - startY, targetX - startX) * 180 / Math.PI;
+            
+            ray.style.setProperty('--ray-length', dist + 'px');
+            ray.style.transform = `rotate(${angle}deg)`;
+            document.body.appendChild(ray);
+            
+            // Impact (Wait for ray to travel)
+            setTimeout(() => {
+                const impact = document.createElement('div');
+                impact.className = 'impact-flash';
+                impact.style.left = targetX + 'px';
+                impact.style.top = targetY + 'px';
+                document.body.appendChild(impact);
+                
+                soundManager.playImpact();
+                vibrate(20);
+                
+                setTimeout(() => {
+                    if (ray.parentNode) ray.remove();
+                    if (impact.parentNode) impact.remove();
+                }, 400);
+            }, 300);
+            
+        }, index * 15); // Stagger rays
+    });
+}
+
 function findMatches() {
     let matches = new Set();
     let superComboTriggered = false;
     let chicComboType = null;
 
     const applyExplosionAroundRun = (run) => {
+        const explosionTargets = [];
         run.forEach(t => {
             const positions = [
                 { r: t.r - 1, c: t.c },
@@ -2097,27 +2197,41 @@ function findMatches() {
             positions.forEach(pos => {
                 if (pos.r >= 0 && pos.r < GRID_SIZE && pos.c >= 0 && pos.c < GRID_SIZE) {
                     const neighbor = grid[pos.r][pos.c];
-                    if (neighbor) matches.add(neighbor);
+                    if (neighbor) {
+                        matches.add(neighbor);
+                        explosionTargets.push(neighbor);
+                    }
                 }
             });
         });
+        const center = run[Math.floor(run.length / 2)];
+        triggerExplosionEffect(center, explosionTargets);
     };
 
     const applyLineClear = (run, orientation, cross = false) => {
         if (run.length === 0) return;
         const center = run[Math.floor(run.length / 2)];
+        const targets = [];
+        
         if (orientation === 'row' || cross) {
             for (let c = 0; c < GRID_SIZE; c++) {
                 const t = grid[center.r][c];
-                if (t) matches.add(t);
+                if (t) {
+                    matches.add(t);
+                    targets.push(t);
+                }
             }
         }
         if (orientation === 'col' || cross) {
             for (let r = 0; r < GRID_SIZE; r++) {
                 const t = grid[r][center.c];
-                if (t) matches.add(t);
+                if (t) {
+                    matches.add(t);
+                    targets.push(t);
+                }
             }
         }
+        triggerExplosionEffect(center, targets);
     };
 
     const checkRun = (run, orientation) => {
@@ -2192,6 +2306,24 @@ function findMatches() {
             if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
                 tilesToCheck.forEach(t => matches.add(t));
                 showBonDabali(); // Recipe always triggers Bon Dabali
+                
+                // Recipe Explosion
+                const center = tilesToCheck[1];
+                const surrounding = [];
+                for(let dr=-1; dr<=1; dr++) {
+                    for(let dc=-1; dc<=1; dc++) {
+                        const nr = center.r + dr;
+                        const nc = center.c + dc;
+                        if(nr>=0 && nr<GRID_SIZE && nc>=0 && nc<GRID_SIZE) {
+                            const neighbor = grid[nr][nc];
+                            if(neighbor && !tilesToCheck.includes(neighbor)) {
+                                matches.add(neighbor);
+                                surrounding.push(neighbor);
+                            }
+                        }
+                    }
+                }
+                triggerExplosionEffect(center, surrounding);
             }
         }
     }
@@ -2202,6 +2334,24 @@ function findMatches() {
             if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
                 tilesToCheck.forEach(t => matches.add(t));
                 showBonDabali();
+                
+                // Recipe Explosion
+                const center = tilesToCheck[1];
+                const surrounding = [];
+                for(let dr=-1; dr<=1; dr++) {
+                    for(let dc=-1; dc<=1; dc++) {
+                        const nr = center.r + dr;
+                        const nc = center.c + dc;
+                        if(nr>=0 && nr<GRID_SIZE && nc>=0 && nc<GRID_SIZE) {
+                            const neighbor = grid[nr][nc];
+                            if(neighbor && !tilesToCheck.includes(neighbor)) {
+                                matches.add(neighbor);
+                                surrounding.push(neighbor);
+                            }
+                        }
+                    }
+                }
+                triggerExplosionEffect(center, surrounding);
             }
         }
     }
