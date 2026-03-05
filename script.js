@@ -226,7 +226,9 @@ function showToast(msg) {
     }, 2000);
 }
 
-// ... Existing Code ...
+// PERSISTENCE & JUICY EFFECTS
+
+function saveGameState() {
     if (moves <= 0 || timeRemaining <= 0) {
         localStorage.removeItem(STORAGE_KEYS.gameState);
         return;
