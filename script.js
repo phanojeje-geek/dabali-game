@@ -43,10 +43,13 @@ function saveGameState() {
         return;
     }
 
-    const gridState = grid.map(row => row.map(tile => ({
-        type: tile.type.id,
-        isObstacle: isObstacleId(tile.type.id)
-    })));
+    const gridState = grid.map(row => row.map(tile => {
+        if (!tile) return null; // Handle holes
+        return {
+            type: tile.type.id,
+            isObstacle: isObstacleId(tile.type.id)
+        };
+    }));
 
     const state = {
         level,
@@ -82,8 +85,17 @@ function loadGameState() {
             let row = [];
             for (let c = 0; c < GRID_SIZE; c++) {
                 const tileData = state.gridState[r][c];
-                let type;
                 
+                if (!tileData) {
+                    // Restore hole
+                    const emptyEl = document.createElement('div');
+                    emptyEl.className = 'tile-empty';
+                    gridEl.appendChild(emptyEl);
+                    row.push(null);
+                    continue;
+                }
+
+                let type;
                 if (tileData.isObstacle) {
                      // Find obstacle def
                      for(let k in OBSTACLES) {
@@ -1107,44 +1119,52 @@ const startBtn = document.getElementById('start-btn');
 const progress = document.querySelector('.progress');
 
 function updateTileSize() {
-    if (!gameBoardEl || !gameContainerEl) {
-        console.warn("gameBoardEl or gameContainerEl not found for updateTileSize");
-        return;
+    try {
+        if (!gameBoardEl || !gameContainerEl) {
+            console.warn("gameBoardEl or gameContainerEl not found for updateTileSize");
+            return;
+        }
+        
+        const headerHeight = headerEl ? headerEl.offsetHeight : 0;
+        const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
+        
+        const containerWidth = gameContainerEl.clientWidth || window.innerWidth || 320;
+        const containerHeight = gameContainerEl.clientHeight || window.innerHeight || 568;
+        
+        const availableWidth = Math.max(140, containerWidth - 16);
+        const availableHeight = Math.max(140, containerHeight - headerHeight - footerHeight - 16);
+        
+        const boardStyles = window.getComputedStyle(gameBoardEl);
+        const borderW = parseFloat(boardStyles.borderLeftWidth) || 0;
+        const paddingW = parseFloat(boardStyles.paddingLeft) || 0;
+        
+        const gridGap = gridEl ? (parseFloat(window.getComputedStyle(gridEl).gap) || 4) : 4;
+        const totalGaps = gridGap * (GRID_SIZE - 1);
+        
+        const maxBoardWidth = Math.max(120, availableWidth - (borderW * 2) - (paddingW * 2));
+        const maxBoardHeight = Math.max(120, availableHeight - (borderW * 2) - (paddingW * 2));
+        
+        const base = Math.min(maxBoardWidth, maxBoardHeight);
+        const raw = Math.floor((base - totalGaps) / GRID_SIZE);
+        const clamped = Math.max(20, Math.min(72, raw));
+        
+        if (!isNaN(clamped)) {
+            document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
+        }
+    } catch (e) {
+        console.error("Error in updateTileSize:", e);
     }
-    const headerHeight = headerEl ? headerEl.offsetHeight : 0;
-    const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
-    const containerWidth = gameContainerEl.clientWidth || window.innerWidth || 320;
-    const containerHeight = gameContainerEl.clientHeight || window.innerHeight || 568;
-    const availableWidth = Math.max(140, containerWidth - 16);
-    const availableHeight = Math.max(140, containerHeight - headerHeight - footerHeight - 16);
-    const boardStyles = window.getComputedStyle(gameBoardEl);
-    const borderW = parseFloat(boardStyles.borderLeftWidth) || 0;
-    const paddingW = parseFloat(boardStyles.paddingLeft) || 0;
-    const gridGap = gridEl ? (parseFloat(window.getComputedStyle(gridEl).gap) || 4) : 4;
-    const totalGaps = gridGap * (GRID_SIZE - 1);
-    const maxBoardWidth = Math.max(120, availableWidth - (borderW * 2) - (paddingW * 2));
-    const maxBoardHeight = Math.max(120, availableHeight - (borderW * 2) - (paddingW * 2));
-    const base = Math.min(maxBoardWidth, maxBoardHeight);
-    const raw = Math.floor((base - totalGaps) / GRID_SIZE);
-    const clamped = Math.max(20, Math.min(72, raw));
-    console.log("Updated Tile Size to:", clamped, "px (from width:", containerWidth, "height:", containerHeight, ")");
-    document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
 }
 
 // INIT
 function initGame() {
     console.log("Dabali Game v1.11 - Init Started");
-    try {
-        if (!document.getElementById('grid')) {
-            console.error("FATAL: #grid element not found in DOM!");
-        } else {
-            console.log("#grid element found.");
-        }
-    updateTileSize();
-    window.addEventListener('resize', updateTileSize);
-    window.addEventListener('orientationchange', updateTileSize);
+    
+    // 1. Splash Logic FIRST (ensure it's not blocked by other logic)
+    const splashScreen = document.getElementById('splash-screen');
+    const startBtn = document.getElementById('start-btn');
+    const progress = document.querySelector('.progress');
 
-    // Splash Logic
     if (progress) {
         setTimeout(() => {
             progress.style.width = '100%';
@@ -1154,7 +1174,7 @@ function initGame() {
     if (startBtn) {
         setTimeout(() => {
             startBtn.classList.remove('hidden');
-        }, 2000);
+        }, 1500); // Reduced slightly for better feel
 
         startBtn.addEventListener('click', () => {
             if (splashScreen) {
@@ -1171,6 +1191,15 @@ function initGame() {
             }
         });
     }
+
+    try {
+        if (!document.getElementById('grid')) {
+            console.error("FATAL: #grid element not found in DOM!");
+        }
+        
+        updateTileSize();
+        window.addEventListener('resize', updateTileSize);
+        window.addEventListener('orientationchange', updateTileSize);
 
     const savedTheme = localStorage.getItem(STORAGE_KEYS.theme);
     if (savedTheme === 'dark') {
