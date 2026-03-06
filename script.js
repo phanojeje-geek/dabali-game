@@ -38,6 +38,7 @@ const STORAGE_KEYS = {
 // BOOSTERS LOGIC
 let activeBooster = null; // 'hammer', 'swap', or null
 let swapSourceTile = null;
+let selectedTile = null; // Defined here once
 
 // Booster State Management
 const BOOSTER_CONFIG = {
@@ -2349,7 +2350,7 @@ function renderTileContent(el, type) {
 let touchStartX = 0;
 let touchStartY = 0;
 let activeTile = null;
-let selectedTile = null;
+// let selectedTile = null; // Removed duplicate declaration
 
 function handleInputStart(e) {
     if (isProcessing || moves <= 0 || isPaused) return; 
