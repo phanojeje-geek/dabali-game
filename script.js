@@ -94,12 +94,11 @@ function activateBooster(type) {
                 updateBoostersUI();
                 return;
             }
-            if (type === 'swap') { // Transform Start
+            if (type === 'swap') { // Hand = Cross Blast
                 activeBooster = 'swap';
-                swapSourceTile = tile; // Set as target to transform
-                tile.el.classList.add('selected');
+                crossBlast(tile);
                 target.classList.remove('selected-booster-target');
-                showToast("Maintenant, touche une case voisine pour copier !");
+                activeBooster = null;
                 updateBoostersUI();
                 return;
             }
@@ -130,7 +129,7 @@ function activateBooster(type) {
     
     let msg = '';
     if (type === 'hammer') msg = '🔨 Mode Marteau : Touche une case pour la détruire !';
-    if (type === 'swap') msg = '✋ Mode Transformation : Sélectionne une case, puis choisis en quoi la transformer !';
+    if (type === 'swap') msg = '✋ Mode Main : Touche une case pour balayer sa ligne et sa colonne !';
     showToast(msg);
 }
 
@@ -146,64 +145,15 @@ function handleBoosterInput(tile) {
         return true;
     }
 
-    if (activeBooster === 'swap') { // Hand = Transform
+    if (activeBooster === 'swap') { // Hand = Cross Blast
         if (!tile) return false;
         
-        // If we don't have a target yet (swapSourceTile is null), this click selects the target
-        if (!swapSourceTile) {
-            // Step 1: Select the tile to transform (the one that will change)
-            swapSourceTile = tile;
-            tile.el.classList.add('selected');
-            soundManager.playClick();
-            showToast("Choisis une case voisine pour copier son ingrédient !");
-            updateBoostersUI(); // Update UI to show selection
-            return true;
-        } else {
-            // Step 2: Select the source type (neighbor)
-            if (swapSourceTile === tile) {
-                // Deselect if clicking the same tile
-                swapSourceTile.el.classList.remove('selected');
-                swapSourceTile = null;
-                activeBooster = null; // Cancel booster
-                updateBoostersUI();
-                return true;
-            }
-            
-            // Transform swapSourceTile INTO tile.type
-            const targetType = tile.type; // The type we want to copy (Source)
-            const tileToTransform = swapSourceTile; // The tile that will change (Target)
-            
-            if (isObstacleId(targetType.id)) {
-                showToast("Impossible de copier un obstacle !");
-                return true;
-            }
-            
-            if (isObstacleId(tileToTransform.type.id)) {
-                showToast("Impossible de transformer un obstacle !");
-                return true;
-            }
-
-            // Animate transformation
-            tileToTransform.type = targetType;
-            renderTileContent(tileToTransform.el, targetType);
-            
-            // Visual effects
-            tileToTransform.el.classList.add('match-anim'); 
-            
-            // Cleanup
-            swapSourceTile.el.classList.remove('selected');
-            swapSourceTile = null;
-            
-            useBooster('swap');
-            activeBooster = null; // Reset booster state
-            updateBoostersUI();
-            
-            soundManager.playPromoSuccess();
-            
-            // Important: Check matches immediately after transformation
-            setTimeout(() => resolveMatchesLoop(), 300);
-            return true;
-        }
+        crossBlast(tile);
+        
+        activeBooster = null; // Reset booster state
+        updateBoostersUI();
+        
+        return true;
     }
 
     return false;
@@ -300,6 +250,104 @@ function updateBoostersUI() {
             }
         }
     });
+}
+
+function crossBlast(centerTile) {
+    if (!centerTile) return;
+    
+    // 1. Visual Effect (Beam)
+    const container = document.getElementById('game-container');
+    const rect = centerTile.el.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    // Horizontal Beam
+    const hBeam = document.createElement('div');
+    hBeam.style.position = 'fixed';
+    hBeam.style.top = (rect.top + 5) + 'px';
+    hBeam.style.left = '0';
+    hBeam.style.width = '100%';
+    hBeam.style.height = (rect.height - 10) + 'px';
+    hBeam.style.background = 'rgba(255, 255, 255, 0.8)';
+    hBeam.style.boxShadow = '0 0 20px white';
+    hBeam.style.zIndex = '9000';
+    hBeam.style.pointerEvents = 'none';
+    document.body.appendChild(hBeam);
+    
+    // Vertical Beam
+    const vBeam = document.createElement('div');
+    vBeam.style.position = 'fixed';
+    vBeam.style.top = '0';
+    vBeam.style.left = (rect.left + 5) + 'px';
+    vBeam.style.width = (rect.width - 10) + 'px';
+    vBeam.style.height = '100%';
+    vBeam.style.background = 'rgba(255, 255, 255, 0.8)';
+    vBeam.style.boxShadow = '0 0 20px white';
+    vBeam.style.zIndex = '9000';
+    vBeam.style.pointerEvents = 'none';
+    document.body.appendChild(vBeam);
+    
+    // Animate Beams
+    const anim = [
+        { opacity: 0, transform: 'scale(0.5)' },
+        { opacity: 1, transform: 'scale(1)' },
+        { opacity: 0, transform: 'scale(1.2)' }
+    ];
+    hBeam.animate(anim, { duration: 300 }).onfinish = () => hBeam.remove();
+    vBeam.animate(anim, { duration: 300 }).onfinish = () => vBeam.remove();
+    
+    // Sound
+    soundManager.playImpact(); // Or a specific blast sound
+    
+    // 2. Destroy Tiles
+    let destroyedCount = 0;
+    
+    // Row
+    for (let c = 0; c < GRID_SIZE; c++) {
+        const tile = grid[centerTile.r][c];
+        if (tile && !matches.includes(tile)) { // Destroy obstacles too? Usually yes for boosters
+             matches.push(tile);
+             destroyedCount++;
+             // Create mini explosion for each
+             createMiniExplosion(tile);
+        }
+    }
+    
+    // Column
+    for (let r = 0; r < GRID_SIZE; r++) {
+        const tile = grid[r][centerTile.c];
+        if (tile && !matches.includes(tile)) {
+             matches.push(tile);
+             destroyedCount++;
+             createMiniExplosion(tile);
+        }
+    }
+    
+    score += destroyedCount * 20;
+    useBooster('swap');
+    
+    // 3. Resolve
+    updateUI();
+    setTimeout(() => resolveMatchesLoop(), 300);
+}
+
+function createMiniExplosion(tile) {
+    if(!tile || !tile.el) return;
+    const rect = tile.el.getBoundingClientRect();
+    const p = document.createElement('div');
+    p.style.position = 'fixed';
+    p.style.left = (rect.left + rect.width/2) + 'px';
+    p.style.top = (rect.top + rect.height/2) + 'px';
+    p.style.width = '20px';
+    p.style.height = '20px';
+    p.style.background = 'orange';
+    p.style.borderRadius = '50%';
+    p.style.zIndex = '9999';
+    document.body.appendChild(p);
+    p.animate([
+        { transform: 'scale(0)', opacity: 1 },
+        { transform: 'scale(2)', opacity: 0 }
+    ], { duration: 300 }).onfinish = () => p.remove();
 }
 
 function destroyTile(tile) {
