@@ -69,55 +69,67 @@ function activateBooster(type) {
     // Toggle off if already active
     if (activeBooster === type) {
         activeBooster = null;
-        if (swapSourceTile) {
-            swapSourceTile.el.classList.remove('selected');
-            swapSourceTile = null;
-        }
         updateBoostersUI();
         return;
     }
     
-    // Deactivate other boosters first
-    activeBooster = null;
-    if (swapSourceTile) {
-        swapSourceTile.el.classList.remove('selected');
-        swapSourceTile = null;
-    }
-
     // Check availability
-    if (type === 'shuffle') {
-        const now = Date.now();
-        if (BOOSTER_CONFIG.shuffle.current > 0) {
-            // Check cooldown if it's the 2nd use (implied by max > 1)
-            if (BOOSTER_CONFIG.shuffle.max > 1 && BOOSTER_CONFIG.shuffle.current < BOOSTER_CONFIG.shuffle.max) {
-                 if (now - BOOSTER_CONFIG.shuffle.lastUsed < 60000) {
-                     const remaining = Math.ceil((60000 - (now - BOOSTER_CONFIG.shuffle.lastUsed))/1000);
-                     showToast(`Attends ${remaining}s !`);
-                     return;
-                 }
-            }
-            
-            useBooster('shuffle');
-            shuffleGrid();
-            vibrate(50);
-        } else {
-            showToast("Plus de mélange !");
-        }
+    if (BOOSTER_CONFIG[type].current <= 0) {
+        showToast("Booster épuisé !");
         return;
     }
 
-    if (BOOSTER_CONFIG[type].current > 0) {
-        activeBooster = type;
-        updateBoostersUI();
-        vibrate(50);
-        
-        let msg = '';
-        if (type === 'hammer') msg = '🔨 Mode Marteau : Touche une case pour la détruire !';
-        if (type === 'swap') msg = '✋ Mode Transformation : Sélectionne une case, puis choisis en quoi la transformer !';
-        showToast(msg);
-    } else {
-        showToast("Épuisé !");
+    // --- NEW LOGIC: Check for Long-Pressed Target ---
+    const target = document.querySelector('.tile.selected-booster-target');
+    
+    if (target && (type === 'hammer' || type === 'swap')) {
+        const tile = getTileFromEl(target);
+        if (tile) {
+            // Apply immediately
+            if (type === 'hammer') {
+                destroyTile(tile);
+                useBooster('hammer');
+                target.classList.remove('selected-booster-target');
+                return;
+            }
+            if (type === 'swap') { // Transform Start
+                activeBooster = 'swap';
+                swapSourceTile = tile; // Set as target to transform
+                tile.el.classList.add('selected');
+                target.classList.remove('selected-booster-target');
+                showToast("Maintenant, touche une case voisine pour copier !");
+                updateBoostersUI();
+                return;
+            }
+        }
     }
+    // --- END NEW LOGIC ---
+
+    if (type === 'shuffle') {
+        // ... (Existing shuffle logic)
+        const now = Date.now();
+        if (BOOSTER_CONFIG.shuffle.max > 1 && BOOSTER_CONFIG.shuffle.current < BOOSTER_CONFIG.shuffle.max) {
+             if (now - BOOSTER_CONFIG.shuffle.lastUsed < 60000) {
+                 const remaining = Math.ceil((60000 - (now - BOOSTER_CONFIG.shuffle.lastUsed))/1000);
+                 showToast(`Attends ${remaining}s !`);
+                 return;
+             }
+        }
+        useBooster('shuffle');
+        shuffleGrid();
+        vibrate(50);
+        return;
+    }
+
+    // Default activation (Legacy mode or if no tile selected)
+    activeBooster = type;
+    updateBoostersUI();
+    vibrate(50);
+    
+    let msg = '';
+    if (type === 'hammer') msg = '🔨 Mode Marteau : Touche une case pour la détruire !';
+    if (type === 'swap') msg = '✋ Mode Transformation : Sélectionne une case, puis choisis en quoi la transformer !';
+    showToast(msg);
 }
 
 function handleBoosterInput(tile) {
@@ -2372,13 +2384,14 @@ function renderTileContent(el, type) {
 let touchStartX = 0;
 let touchStartY = 0;
 let activeTile = null;
-// let selectedTile = null; // Removed duplicate declaration
+let longPressTimer = null;
+let longPressTarget = null;
+let isLongPressActive = false;
 
 function handleInputStart(e) {
     if (isProcessing || moves <= 0 || isPaused) return; 
     
     let target = e.target;
-    // Traverse up to find .tile if clicked on child
     while (target && !target.classList.contains('tile') && target !== gridEl) {
         target = target.parentElement;
     }
@@ -2386,63 +2399,86 @@ function handleInputStart(e) {
 
     const tile = getTileFromEl(target);
     if (!tile) return;
+    
+    // --- LONG PRESS LOGIC START ---
+    isLongPressActive = false;
+    longPressTarget = tile;
+    
+    // Start timer for 1s (1000ms) long press
+    longPressTimer = setTimeout(() => {
+        isLongPressActive = true;
+        // Visual feedback for Long Press Selection
+        document.querySelectorAll('.tile').forEach(t => t.classList.remove('selected-booster-target'));
+        tile.el.classList.add('selected-booster-target');
+        
+        vibrate([50, 50, 50]); // Distinct vibration
+        soundManager.playClick();
+        showToast("Case sélectionnée ! Choisis maintenant un Booster (Marteau ou Main)");
+        
+        // If we already have an active booster (e.g. Hand), we might want to apply it immediately?
+        // But user said: "maintienne l'élément... ensuite sélectionne le marteau ou la main"
+        // So we just mark it as selected for now.
+    }, 800); // 800ms is usually enough for "long press" feel
+    // --- LONG PRESS LOGIC END ---
 
-    // Booster Handling
-    if (activeBooster) {
+    // Booster Handling (Legacy direct click logic removed/adapted below)
+    // If we click a tile while a booster is active AND we didn't just do a long press...
+    // But now the flow is reversed: Select Tile -> Click Booster.
+    // However, we should support both if possible, or strictly follow new rule.
+    // Let's support the new rule: Long Press Tile -> then Click Booster.
+    
+    if (activeBooster && activeBooster === 'swap' && swapSourceTile) {
+        // This is the second step of Hand (Transformation): Clicking the Source (Neighbor)
+        // This happens AFTER a target was selected.
         if (handleBoosterInput(tile)) {
             e.preventDefault();
             e.stopPropagation();
+            clearTimeout(longPressTimer); // Cancel long press if it was a quick click for action
             return;
         }
     }
 
     resetHintTimer(); 
     
-    // Normal Swap Logic
     if (e.type === 'touchstart') {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         activeTile = tile;
-        // Don't prevent default to allow scroll if needed, 
-        // but usually game prevents default via CSS touch-action: none
     } else if (e.type === 'mousedown') {
-        if (selectedTile) {
-            // Check if same tile clicked -> deselect
-            if (selectedTile === tile) {
-                selectedTile.el.classList.remove('selected');
-                selectedTile = null;
-                return;
-            }
-            
-            // Try swap
-            attemptSwap(selectedTile, tile);
-            selectedTile.el.classList.remove('selected');
-            selectedTile = null;
-        } else {
-            // First click -> Select
-            selectedTile = tile;
-            tile.el.classList.add('selected');
-            soundManager.playClick();
-        }
+        // Mouse logic similar to touch for swipe
+        touchStartX = e.clientX;
+        touchStartY = e.clientY;
+        activeTile = tile;
     }
 }
 
-// Add global listeners for swipe end
-// We need to attach these once, preferably in init or outside
-// But here is fine if guarded
-if (!window.touchHandlersAdded) {
-    document.addEventListener('touchend', handleTouchEnd, {passive: false});
-    window.touchHandlersAdded = true;
-}
-
-function handleTouchEnd(e) {
+function handleInputEnd(e) {
+    // Clear long press timer if released too early
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+    
+    // If it was a long press, we don't do swipe/click logic
+    if (isLongPressActive) {
+        isLongPressActive = false;
+        return; 
+    }
+    
+    // ... Existing Swipe Logic ...
     if (!activeTile || isProcessing || isPaused) return;
     
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
+    let clientX, clientY;
+    if (e.type === 'touchend') {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
     
-    const dx = touchEndX - touchStartX;
-    const dy = touchEndY - touchStartY;
+    const dx = clientX - touchStartX;
+    const dy = clientY - touchStartY;
     
     // Threshold for swipe
     if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
@@ -2450,10 +2486,8 @@ function handleTouchEnd(e) {
         let targetC = activeTile.c;
         
         if (Math.abs(dx) > Math.abs(dy)) {
-            // Horizontal
             targetC += (dx > 0 ? 1 : -1);
         } else {
-            // Vertical
             targetR += (dy > 0 ? 1 : -1);
         }
         
@@ -2465,8 +2499,8 @@ function handleTouchEnd(e) {
         }
         activeTile = null;
     } else {
-         // Tap (no swipe)
-         // Treat as click for selection logic on touch devices if needed
+         // Tap (Click)
+         // Standard Selection for Swap
          if (selectedTile) {
              if (selectedTile === activeTile) {
                  selectedTile.el.classList.remove('selected');
@@ -2477,12 +2511,24 @@ function handleTouchEnd(e) {
                  selectedTile = null;
              }
          } else {
+             // Just a tap, maybe selecting for normal swap?
+             // But wait, if we tap, we didn't long press.
+             // If we just tap, we select for normal move.
              selectedTile = activeTile;
              activeTile.el.classList.add('selected');
              soundManager.playClick();
          }
          activeTile = null;
     }
+}
+
+// Attach listeners properly
+if (!window.inputHandlersAdded) {
+    // Touch
+    document.addEventListener('touchend', handleInputEnd, {passive: false});
+    // Mouse
+    document.addEventListener('mouseup', handleInputEnd);
+    window.inputHandlersAdded = true;
 }
 
 function getTileFromEl(el) {

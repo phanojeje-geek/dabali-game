@@ -1005,11 +1005,13 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* Avatar Styles Removed */
 
 
-/* Combo 4+ Effect */
-.tile.combo-4-anim {
-    animation: comboPulse 0.5s ease-out;
+/* Long Press Selection */
+.tile.selected-booster-target {
+    border: 3px solid #FF4500;
+    box-shadow: 0 0 15px #FF4500;
+    transform: scale(1.1);
     z-index: 100;
-    filter: brightness(1.5) drop-shadow(0 0 10px gold);
+    animation: pulse 1s infinite;
 }
 
 @keyframes comboPulse {
