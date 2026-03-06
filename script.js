@@ -39,32 +39,81 @@ const STORAGE_KEYS = {
 let activeBooster = null; // 'hammer', 'swap', or null
 let swapSourceTile = null;
 
+// Booster State Management
+const BOOSTER_CONFIG = {
+    hammer: { max: 3, current: 3 },
+    swap: { max: 3, current: 3 },
+    shuffle: { max: 1, current: 1, cooldown: 0, lastUsed: 0 }
+};
+
+function initBoosterState() {
+    // Reset boosters per level based on rules
+    BOOSTER_CONFIG.hammer.current = 3;
+    BOOSTER_CONFIG.swap.current = 3;
+    
+    if (level >= 10) {
+        BOOSTER_CONFIG.shuffle.max = 2;
+        BOOSTER_CONFIG.shuffle.current = 2;
+    } else {
+        BOOSTER_CONFIG.shuffle.max = 1;
+        BOOSTER_CONFIG.shuffle.current = 1;
+    }
+    BOOSTER_CONFIG.shuffle.cooldown = 0;
+    updateBoostersUI();
+}
+
 function activateBooster(type) {
+    if (moves <= 0 || isPaused) return;
+
+    // Toggle off if already active
     if (activeBooster === type) {
-        activeBooster = null; // Deactivate if clicked again
-        swapSourceTile = null;
+        activeBooster = null;
+        if (swapSourceTile) {
+            swapSourceTile.el.classList.remove('selected');
+            swapSourceTile = null;
+        }
         updateBoostersUI();
         return;
     }
     
+    // Deactivate other boosters first
+    activeBooster = null;
+    if (swapSourceTile) {
+        swapSourceTile.el.classList.remove('selected');
+        swapSourceTile = null;
+    }
+
+    // Check availability
     if (type === 'shuffle') {
-        if (getBoosterCount('shuffle') > 0) {
+        const now = Date.now();
+        if (BOOSTER_CONFIG.shuffle.current > 0) {
+            // Check cooldown if it's the 2nd use (implied by max > 1)
+            if (BOOSTER_CONFIG.shuffle.max > 1 && BOOSTER_CONFIG.shuffle.current < BOOSTER_CONFIG.shuffle.max) {
+                 if (now - BOOSTER_CONFIG.shuffle.lastUsed < 60000) {
+                     const remaining = Math.ceil((60000 - (now - BOOSTER_CONFIG.shuffle.lastUsed))/1000);
+                     showToast(`Attends ${remaining}s !`);
+                     return;
+                 }
+            }
+            
             useBooster('shuffle');
             shuffleGrid();
             vibrate(50);
+        } else {
+            showToast("Plus de mélange !");
         }
         return;
     }
 
-    if (getBoosterCount(type) > 0) {
+    if (BOOSTER_CONFIG[type].current > 0) {
         activeBooster = type;
-        swapSourceTile = null;
         updateBoostersUI();
         vibrate(50);
         
-        // Show hint
-        const msg = type === 'hammer' ? 'Touche une case pour la casser !' : 'Touche deux cases pour échanger !';
+        const msg = type === 'hammer' ? 'Touche une case pour casser !' : 'Touche deux cases pour échanger !';
         showToast(msg);
+    } else {
+        showToast("Épuisé !");
     }
 }
 
@@ -72,7 +121,7 @@ function handleBoosterInput(tile) {
     if (!activeBooster) return false;
 
     if (activeBooster === 'hammer') {
-        // Break tile logic
+        if (!tile) return false;
         destroyTile(tile);
         useBooster('hammer');
         activeBooster = null;
@@ -81,22 +130,29 @@ function handleBoosterInput(tile) {
     }
 
     if (activeBooster === 'swap') {
+        if (!tile) return false;
+        
         if (!swapSourceTile) {
             swapSourceTile = tile;
             tile.el.classList.add('selected');
+            soundManager.playClick();
             return true;
         } else {
+            if (swapSourceTile === tile) {
+                // Deselect
+                swapSourceTile.el.classList.remove('selected');
+                swapSourceTile = null;
+                return true;
+            }
+            
             // Perform swap
             swapTiles(swapSourceTile, tile).then(() => {
-                // Check matches after swap (optional for booster? Usually yes)
-                // For a "Hand" booster, usually it doesn't use a move but allows swap without match
-                // Here we allow swap anywhere.
                 swapSourceTile.el.classList.remove('selected');
                 swapSourceTile = null;
                 useBooster('swap');
                 activeBooster = null;
                 updateBoostersUI();
-                resolveMatchesLoop(); // Trigger matches if any
+                resolveMatchesLoop();
             });
             return true;
         }
@@ -106,22 +162,95 @@ function handleBoosterInput(tile) {
 }
 
 function getBoosterCount(type) {
-    // Mock counts for now, could be stored in localStorage
-    return 5; 
+    return BOOSTER_CONFIG[type].current;
 }
 
 function useBooster(type) {
-    // Decrease count logic
-    console.log(`Used booster: ${type}`);
-    // updateBoosterCount(type, getBoosterCount(type) - 1);
+    if (BOOSTER_CONFIG[type].current > 0) {
+        BOOSTER_CONFIG[type].current--;
+        if (type === 'shuffle') {
+            BOOSTER_CONFIG.shuffle.lastUsed = Date.now();
+            if (BOOSTER_CONFIG.shuffle.current > 0 && BOOSTER_CONFIG.shuffle.max > 1) {
+                // Start cooldown timer UI update loop?
+                startShuffleCooldownTimer();
+            }
+        }
+    }
+    updateBoostersUI();
+}
+
+let shuffleTimerInterval = null;
+function startShuffleCooldownTimer() {
+    if (shuffleTimerInterval) clearInterval(shuffleTimerInterval);
+    const btn = document.querySelector('.booster-item[title="Mélange"] .booster-count');
+    
+    shuffleTimerInterval = setInterval(() => {
+        if (BOOSTER_CONFIG.shuffle.current === 0) {
+            clearInterval(shuffleTimerInterval);
+            updateBoostersUI();
+            return;
+        }
+        const now = Date.now();
+        const diff = now - BOOSTER_CONFIG.shuffle.lastUsed;
+        if (diff >= 60000) {
+            clearInterval(shuffleTimerInterval);
+            updateBoostersUI();
+        } else {
+            if(btn) btn.innerText = Math.ceil((60000 - diff)/1000) + 's';
+        }
+    }, 1000);
 }
 
 function updateBoostersUI() {
     const boosters = document.querySelectorAll('.booster-item');
     boosters.forEach(b => {
+        const title = b.getAttribute('title');
+        let type = '';
+        if (title === 'Marteau') type = 'hammer';
+        else if (title === 'Mélange') type = 'shuffle';
+        else if (title === 'Main') type = 'swap';
+        
+        if (!type) return;
+        
+        const count = BOOSTER_CONFIG[type].current;
+        const countEl = b.querySelector('.booster-count');
+        
+        // Update count text
+        if (type === 'shuffle' && BOOSTER_CONFIG.shuffle.max > 1 && count > 0 && count < BOOSTER_CONFIG.shuffle.max) {
+             const now = Date.now();
+             if (now - BOOSTER_CONFIG.shuffle.lastUsed < 60000) {
+                 // Timer is running via interval, don't overwrite
+             } else {
+                 countEl.innerText = count;
+             }
+        } else {
+            countEl.innerText = count;
+        }
+
+        // Active state
         b.classList.remove('active');
-        if (activeBooster === 'hammer' && b.title === 'Marteau') b.classList.add('active');
-        if (activeBooster === 'swap' && b.title === 'Main') b.classList.add('active');
+        if (activeBooster === type) b.classList.add('active');
+        
+        // Disabled/Grayed state
+        if (count <= 0) {
+            b.classList.add('disabled');
+            b.style.opacity = '0.5';
+            b.style.pointerEvents = 'none'; // Prevent clicks
+            b.style.filter = 'grayscale(100%)';
+        } else {
+            b.classList.remove('disabled');
+            b.style.opacity = '1';
+            b.style.pointerEvents = 'auto';
+            b.style.filter = 'none';
+            
+            // Special check for shuffle cooldown
+            if (type === 'shuffle' && BOOSTER_CONFIG.shuffle.max > 1 && count < BOOSTER_CONFIG.shuffle.max) {
+                const now = Date.now();
+                if (now - BOOSTER_CONFIG.shuffle.lastUsed < 60000) {
+                     b.style.opacity = '0.7'; // Dimmed while cooling down
+                }
+            }
+        }
     });
 }
 
@@ -2220,36 +2349,49 @@ function renderTileContent(el, type) {
 let touchStartX = 0;
 let touchStartY = 0;
 let activeTile = null;
+let selectedTile = null;
 
 function handleInputStart(e) {
-    if (isProcessing || moves <= 0 || isPaused) return; // Added isPaused check
+    if (isProcessing || moves <= 0 || isPaused) return; 
     
-    // Check booster active
+    let target = e.target;
+    // Traverse up to find .tile if clicked on child
+    while (target && !target.classList.contains('tile') && target !== gridEl) {
+        target = target.parentElement;
+    }
+    if (!target || !target.classList.contains('tile')) return;
+
+    const tile = getTileFromEl(target);
+    if (!tile) return;
+
+    // Booster Handling
     if (activeBooster) {
-        const tile = getTileFromEl(e.target);
-        if (tile && handleBoosterInput(tile)) {
+        if (handleBoosterInput(tile)) {
             e.preventDefault();
+            e.stopPropagation();
             return;
         }
     }
 
-    resetHintTimer(); // Reset hint timer on interaction
+    resetHintTimer(); 
     
-    // Sound
-    soundManager.playClick();
-
+    // Normal Swap Logic
     if (e.type === 'touchstart') {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
-        const tile = getTileFromEl(e.target);
-        if (!tile || isImmovable(tile)) return;
         activeTile = tile;
-    } else {
-        // Mouse click selection
-        const tile = getTileFromEl(e.target);
-        if (!tile || isImmovable(tile)) return;
+        // Don't prevent default to allow scroll if needed, 
+        // but usually game prevents default via CSS touch-action: none
+    } else if (e.type === 'mousedown') {
         if (selectedTile) {
-            // Second click -> Try swap
+            // Check if same tile clicked -> deselect
+            if (selectedTile === tile) {
+                selectedTile.el.classList.remove('selected');
+                selectedTile = null;
+                return;
+            }
+            
+            // Try swap
             attemptSwap(selectedTile, tile);
             selectedTile.el.classList.remove('selected');
             selectedTile = null;
@@ -2257,15 +2399,21 @@ function handleInputStart(e) {
             // First click -> Select
             selectedTile = tile;
             tile.el.classList.add('selected');
+            soundManager.playClick();
         }
     }
 }
 
 // Add global listeners for swipe end
-document.addEventListener('touchend', handleTouchEnd);
+// We need to attach these once, preferably in init or outside
+// But here is fine if guarded
+if (!window.touchHandlersAdded) {
+    document.addEventListener('touchend', handleTouchEnd, {passive: false});
+    window.touchHandlersAdded = true;
+}
 
 function handleTouchEnd(e) {
-    if (!activeTile || isProcessing) return;
+    if (!activeTile || isProcessing || isPaused) return;
     
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
@@ -2273,24 +2421,45 @@ function handleTouchEnd(e) {
     const dx = touchEndX - touchStartX;
     const dy = touchEndY - touchStartY;
     
-    if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal
-        if (Math.abs(dx) > 30) { // Threshold
-            const targetC = activeTile.c + (dx > 0 ? 1 : -1);
-            if (targetC >= 0 && targetC < GRID_SIZE) {
-                attemptSwap(activeTile, grid[activeTile.r][targetC]);
+    // Threshold for swipe
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        let targetR = activeTile.r;
+        let targetC = activeTile.c;
+        
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal
+            targetC += (dx > 0 ? 1 : -1);
+        } else {
+            // Vertical
+            targetR += (dy > 0 ? 1 : -1);
+        }
+        
+        if (targetR >= 0 && targetR < GRID_SIZE && targetC >= 0 && targetC < GRID_SIZE) {
+            const targetTile = grid[targetR][targetC];
+            if (targetTile) {
+                attemptSwap(activeTile, targetTile);
             }
         }
+        activeTile = null;
     } else {
-        // Vertical
-        if (Math.abs(dy) > 30) {
-            const targetR = activeTile.r + (dy > 0 ? 1 : -1);
-            if (targetR >= 0 && targetR < GRID_SIZE) {
-                attemptSwap(activeTile, grid[targetR][activeTile.c]);
-            }
-        }
+         // Tap (no swipe)
+         // Treat as click for selection logic on touch devices if needed
+         if (selectedTile) {
+             if (selectedTile === activeTile) {
+                 selectedTile.el.classList.remove('selected');
+                 selectedTile = null;
+             } else {
+                 attemptSwap(selectedTile, activeTile);
+                 selectedTile.el.classList.remove('selected');
+                 selectedTile = null;
+             }
+         } else {
+             selectedTile = activeTile;
+             activeTile.el.classList.add('selected');
+             soundManager.playClick();
+         }
+         activeTile = null;
     }
-    activeTile = null;
 }
 
 function getTileFromEl(el) {
