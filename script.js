@@ -90,6 +90,8 @@ function activateBooster(type) {
                 destroyTile(tile);
                 useBooster('hammer');
                 target.classList.remove('selected-booster-target');
+                activeBooster = null; // Reset active booster
+                updateBoostersUI();
                 return;
             }
             if (type === 'swap') { // Transform Start
@@ -147,36 +149,29 @@ function handleBoosterInput(tile) {
     if (activeBooster === 'swap') { // Hand = Transform
         if (!tile) return false;
         
+        // If we don't have a target yet (swapSourceTile is null), this click selects the target
         if (!swapSourceTile) {
             // Step 1: Select the tile to transform (the one that will change)
             swapSourceTile = tile;
             tile.el.classList.add('selected');
             soundManager.playClick();
             showToast("Choisis une case voisine pour copier son ingrédient !");
+            updateBoostersUI(); // Update UI to show selection
             return true;
         } else {
             // Step 2: Select the source type (neighbor)
             if (swapSourceTile === tile) {
-                // Deselect
+                // Deselect if clicking the same tile
                 swapSourceTile.el.classList.remove('selected');
                 swapSourceTile = null;
+                activeBooster = null; // Cancel booster
+                updateBoostersUI();
                 return true;
             }
             
-            // Check if it's a neighbor (optional but better for gameplay)
-            const isAdjacent = Math.abs(swapSourceTile.r - tile.r) + Math.abs(swapSourceTile.c - tile.c) === 1;
-            if (!isAdjacent) {
-                showToast("Il faut choisir une case voisine !");
-                return true;
-            }
-
             // Transform swapSourceTile INTO tile.type
-            // The user clicked TARGET first, then SOURCE.
-            // Requirement: "si on a deux piments et que à coté des deux piments c'est un oignon, la main doit permettre de changer l'oignon en piment"
-            // This means: Click Onion (Target) -> Click Piment (Source) -> Onion becomes Piment.
-            
-            const targetType = tile.type; // The type we want to copy
-            const tileToTransform = swapSourceTile; // The tile that will change
+            const targetType = tile.type; // The type we want to copy (Source)
+            const tileToTransform = swapSourceTile; // The tile that will change (Target)
             
             if (isObstacleId(targetType.id)) {
                 showToast("Impossible de copier un obstacle !");
@@ -200,7 +195,7 @@ function handleBoosterInput(tile) {
             swapSourceTile = null;
             
             useBooster('swap');
-            activeBooster = null;
+            activeBooster = null; // Reset booster state
             updateBoostersUI();
             
             soundManager.playPromoSuccess();
