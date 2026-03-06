@@ -50,8 +50,15 @@ const BOOSTER_CONFIG = {
 function initBoosterState() {
     // Reset boosters per level based on rules
     BOOSTER_CONFIG.hammer.current = 3;
-    BOOSTER_CONFIG.swap.current = 3;
-    BOOSTER_CONFIG.shuffle.current = 2; // Fixed to 2 for now as requested
+    BOOSTER_CONFIG.swap.current = 3; // Fixed to 3
+    
+    if (level >= 10) {
+        BOOSTER_CONFIG.shuffle.max = 2;
+        BOOSTER_CONFIG.shuffle.current = 2;
+    } else {
+        BOOSTER_CONFIG.shuffle.max = 1;
+        BOOSTER_CONFIG.shuffle.current = 1;
+    }
     BOOSTER_CONFIG.shuffle.cooldown = 0;
     updateBoostersUI();
 }
@@ -129,17 +136,11 @@ function handleBoosterInput(tile) {
         if (!tile) return false;
         
         if (!swapSourceTile) {
-            // Step 1: Select the tile to transform
+            // Step 1: Select the tile to transform (the one that will change)
             swapSourceTile = tile;
             tile.el.classList.add('selected');
             soundManager.playClick();
-            
-            // Show a mini-menu or just expect next click to be a neighbor?
-            // User requirement: "si on a deux piments et que à coté des deux piments c'est un oignon, la main doit permettre de changer l'oignon en piment"
-            // Implementation: Select target -> Select source type from neighbor?
-            // Simpler: Click tile -> Cycle through ingredients? Or Click Tile -> Click neighbor to copy its type?
-            // Let's do: Click Target -> Click Source (to copy type from).
-            showToast("Maintenant, touche une case voisine pour copier son ingrédient !");
+            showToast("Choisis une case voisine pour copier son ingrédient !");
             return true;
         } else {
             // Step 2: Select the source type (neighbor)
@@ -150,20 +151,39 @@ function handleBoosterInput(tile) {
                 return true;
             }
             
+            // Check if it's a neighbor (optional but better for gameplay)
+            const isAdjacent = Math.abs(swapSourceTile.r - tile.r) + Math.abs(swapSourceTile.c - tile.c) === 1;
+            if (!isAdjacent) {
+                showToast("Il faut choisir une case voisine !");
+                return true;
+            }
+
             // Transform swapSourceTile INTO tile.type
-            const targetType = tile.type;
-            const tileToTransform = swapSourceTile;
+            // The user clicked TARGET first, then SOURCE.
+            // Requirement: "si on a deux piments et que à coté des deux piments c'est un oignon, la main doit permettre de changer l'oignon en piment"
+            // This means: Click Onion (Target) -> Click Piment (Source) -> Onion becomes Piment.
+            
+            const targetType = tile.type; // The type we want to copy
+            const tileToTransform = swapSourceTile; // The tile that will change
             
             if (isObstacleId(targetType.id)) {
                 showToast("Impossible de copier un obstacle !");
+                return true;
+            }
+            
+            if (isObstacleId(tileToTransform.type.id)) {
+                showToast("Impossible de transformer un obstacle !");
                 return true;
             }
 
             // Animate transformation
             tileToTransform.type = targetType;
             renderTileContent(tileToTransform.el, targetType);
-            tileToTransform.el.classList.add('match-anim'); // visual feedback
             
+            // Visual effects
+            tileToTransform.el.classList.add('match-anim'); 
+            
+            // Cleanup
             swapSourceTile.el.classList.remove('selected');
             swapSourceTile = null;
             
@@ -172,7 +192,9 @@ function handleBoosterInput(tile) {
             updateBoostersUI();
             
             soundManager.playPromoSuccess();
-            resolveMatchesLoop(); // Check if this created a match
+            
+            // Important: Check matches immediately after transformation
+            setTimeout(() => resolveMatchesLoop(), 300);
             return true;
         }
     }
