@@ -871,10 +871,10 @@ let freeSuperCombos = 0;
 let comboCount = 0;
 
 let timerInterval = null;
-let avatarEl = null;
-let avatarState = 'neutral';
-let avatarIdleTimeout = null;
-let avatarLimbsEl = null;
+// let avatarEl = null; // Removed
+// let avatarState = 'neutral';
+// let avatarIdleTimeout = null;
+// let avatarLimbsEl = null;
 let timeRemaining = 90; // 1m30s
 let isPaused = false;
 let hintTimeout = null;
@@ -1832,25 +1832,7 @@ function initGame() {
 
         const avatarBody = document.getElementById('avatar-body');
         if (avatarBody) {
-            avatarEl = document.createElement('div');
-            avatarEl.className = 'avatar-face';
-            avatarBody.appendChild(avatarEl);
-            avatarLimbsEl = document.createElement('div');
-            avatarLimbsEl.id = 'avatar-limbs';
-            const armLeft = document.createElement('div');
-            armLeft.className = 'avatar-arm left';
-            const armRight = document.createElement('div');
-            armRight.className = 'avatar-arm right';
-            const legLeft = document.createElement('div');
-            legLeft.className = 'avatar-leg left';
-            const legRight = document.createElement('div');
-            legRight.className = 'avatar-leg right';
-            avatarLimbsEl.appendChild(armLeft);
-            avatarLimbsEl.appendChild(armRight);
-            avatarLimbsEl.appendChild(legLeft);
-            avatarLimbsEl.appendChild(legRight);
-            avatarBody.appendChild(avatarLimbsEl);
-            setAvatarMood('neutral');
+            // Avatar removed
         }
 
         if (tutorialOkBtn) {
@@ -2003,7 +1985,7 @@ function startLevel(lvl, resume = false) {
         clearInterval(timerInterval);
         timeRemaining = 90; // 90 seconds
         startTimer();
-        setAvatarMood('neutral');
+        // setAvatarMood('neutral'); // Removed
 
         // Init Goals
         if (!levelConfig.goals) {
@@ -2185,7 +2167,7 @@ function updateTimerUI() {
 
 function handleGameOver() {
     isProcessing = true;
-    setAvatarMood('angry');
+    // setAvatarMood('angry'); // Removed
     setTimeout(() => {
         vibrate([200, 120, 200, 120, 260]);
         document.getElementById('modal-title').innerText = "YAKO !";
@@ -3032,9 +3014,7 @@ async function processMatches(matches) {
     }
 
     updateUI();
-    if (matches.length >= 7) {
-        setAvatarMood('happy');
-    }
+    // setAvatarMood('happy'); // Removed
     
     await new Promise(r => setTimeout(r, 300));
     

@@ -496,17 +496,8 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 
 /* MEDIA QUERIES */
 @media (max-width: 360px) {
-    #avatar-container {
-        width: 50px;
-        height: 50px;
-        bottom: 5px;
-    }
-    .avatar-face {
-        font-size: 30px;
-        line-height: 50px;
-    }
     .boosters-container {
-        margin-bottom: 60px;
+        margin-bottom: 10px; /* Reduced margin since avatar is gone */
         padding: 5px;
         gap: 10px;
     }
@@ -518,11 +509,8 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
 }
 
 @media (min-height: 800px) {
-    #avatar-container {
-        bottom: 20px;
-    }
     .boosters-container {
-        margin-bottom: 90px;
+        margin-bottom: 20px; /* Reduced margin */
     }
 }
 
@@ -1014,37 +1002,8 @@ input:checked + .slider:before { transform: translateX(26px); }
     display: none;
 }
 
-/* AVATAR */
-#avatar-container {
-    position: fixed;
-    bottom: 10px; /* Positionné tout en bas */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px; /* Réduit de 80px à 60px */
-    height: 60px;
-    z-index: 2000;
-    pointer-events: none;
-    transition: transform 0.3s ease;
-}
+/* Avatar Styles Removed */
 
-#avatar-body {
-    width: 100%;
-    height: 100%;
-    background: #8B4513; /* Peau */
-    border-radius: 50%;
-    position: relative;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-}
-
-.avatar-face {
-    font-size: 35px; /* Réduit */
-    text-align: center;
-    line-height: 60px; /* Centré verticalement */
-}
-
-.avatar-happy #avatar-body { animation: bounce 0.6s infinite; }
-.avatar-angry #avatar-body { animation: shake 0.4s infinite; }
-.avatar-bored #avatar-body { opacity: 0.8; transform: rotate(5deg); }
 
 /* Combo 4+ Effect */
 .tile.combo-4-anim {
