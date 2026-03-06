@@ -43,22 +43,15 @@ let selectedTile = null; // Defined here once
 // Booster State Management
 const BOOSTER_CONFIG = {
     hammer: { max: 3, current: 3 },
-    swap: { max: 3, current: 3 },
-    shuffle: { max: 1, current: 1, cooldown: 0, lastUsed: 0 }
+    swap: { max: 3, current: 3 }, // Now "Transform"
+    shuffle: { max: 2, current: 2, cooldown: 0, lastUsed: 0 }
 };
 
 function initBoosterState() {
     // Reset boosters per level based on rules
     BOOSTER_CONFIG.hammer.current = 3;
     BOOSTER_CONFIG.swap.current = 3;
-    
-    if (level >= 10) {
-        BOOSTER_CONFIG.shuffle.max = 2;
-        BOOSTER_CONFIG.shuffle.current = 2;
-    } else {
-        BOOSTER_CONFIG.shuffle.max = 1;
-        BOOSTER_CONFIG.shuffle.current = 1;
-    }
+    BOOSTER_CONFIG.shuffle.current = 2; // Fixed to 2 for now as requested
     BOOSTER_CONFIG.shuffle.cooldown = 0;
     updateBoostersUI();
 }
@@ -111,7 +104,9 @@ function activateBooster(type) {
         updateBoostersUI();
         vibrate(50);
         
-        const msg = type === 'hammer' ? 'Touche une case pour casser !' : 'Touche deux cases pour échanger !';
+        let msg = '';
+        if (type === 'hammer') msg = '🔨 Mode Marteau : Touche une case pour la détruire !';
+        if (type === 'swap') msg = '✋ Mode Transformation : Sélectionne une case, puis choisis en quoi la transformer !';
         showToast(msg);
     } else {
         showToast("Épuisé !");
@@ -130,15 +125,24 @@ function handleBoosterInput(tile) {
         return true;
     }
 
-    if (activeBooster === 'swap') {
+    if (activeBooster === 'swap') { // Hand = Transform
         if (!tile) return false;
         
         if (!swapSourceTile) {
+            // Step 1: Select the tile to transform
             swapSourceTile = tile;
             tile.el.classList.add('selected');
             soundManager.playClick();
+            
+            // Show a mini-menu or just expect next click to be a neighbor?
+            // User requirement: "si on a deux piments et que à coté des deux piments c'est un oignon, la main doit permettre de changer l'oignon en piment"
+            // Implementation: Select target -> Select source type from neighbor?
+            // Simpler: Click tile -> Cycle through ingredients? Or Click Tile -> Click neighbor to copy its type?
+            // Let's do: Click Target -> Click Source (to copy type from).
+            showToast("Maintenant, touche une case voisine pour copier son ingrédient !");
             return true;
         } else {
+            // Step 2: Select the source type (neighbor)
             if (swapSourceTile === tile) {
                 // Deselect
                 swapSourceTile.el.classList.remove('selected');
@@ -146,15 +150,29 @@ function handleBoosterInput(tile) {
                 return true;
             }
             
-            // Perform swap
-            swapTiles(swapSourceTile, tile).then(() => {
-                swapSourceTile.el.classList.remove('selected');
-                swapSourceTile = null;
-                useBooster('swap');
-                activeBooster = null;
-                updateBoostersUI();
-                resolveMatchesLoop();
-            });
+            // Transform swapSourceTile INTO tile.type
+            const targetType = tile.type;
+            const tileToTransform = swapSourceTile;
+            
+            if (isObstacleId(targetType.id)) {
+                showToast("Impossible de copier un obstacle !");
+                return true;
+            }
+
+            // Animate transformation
+            tileToTransform.type = targetType;
+            renderTileContent(tileToTransform.el, targetType);
+            tileToTransform.el.classList.add('match-anim'); // visual feedback
+            
+            swapSourceTile.el.classList.remove('selected');
+            swapSourceTile = null;
+            
+            useBooster('swap');
+            activeBooster = null;
+            updateBoostersUI();
+            
+            soundManager.playPromoSuccess();
+            resolveMatchesLoop(); // Check if this created a match
             return true;
         }
     }
