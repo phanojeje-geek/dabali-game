@@ -300,15 +300,13 @@ function crossBlast(centerTile) {
     soundManager.playImpact(); // Or a specific blast sound
     
     // 2. Destroy Tiles
-    let destroyedCount = 0;
+    let tilesToDestroy = [];
     
     // Row
     for (let c = 0; c < GRID_SIZE; c++) {
         const tile = grid[centerTile.r][c];
-        if (tile && !matches.includes(tile)) { // Destroy obstacles too? Usually yes for boosters
-             matches.push(tile);
-             destroyedCount++;
-             // Create mini explosion for each
+        if (tile) {
+             tilesToDestroy.push(tile);
              createMiniExplosion(tile);
         }
     }
@@ -316,19 +314,20 @@ function crossBlast(centerTile) {
     // Column
     for (let r = 0; r < GRID_SIZE; r++) {
         const tile = grid[r][centerTile.c];
-        if (tile && !matches.includes(tile)) {
-             matches.push(tile);
-             destroyedCount++;
+        if (tile && !tilesToDestroy.includes(tile)) {
+             tilesToDestroy.push(tile);
              createMiniExplosion(tile);
         }
     }
     
-    score += destroyedCount * 20;
+    score += tilesToDestroy.length * 20;
     useBooster('swap');
     
     // 3. Resolve
     updateUI();
-    setTimeout(() => resolveMatchesLoop(), 300);
+    processMatches(tilesToDestroy).then(() => {
+        resolveMatchesLoop();
+    });
 }
 
 function createMiniExplosion(tile) {
@@ -385,12 +384,13 @@ function destroyTile(tile) {
     
     // Destroy logic
     // We treat it as a match of 1 for the purpose of removing it
-    matches.add(tile);
     score += 50; // Bonus points for hammering
     updateUI();
     
     soundManager.playImpact();
-    resolveMatchesLoop();
+    processMatches([tile]).then(() => {
+        resolveMatchesLoop();
+    });
 }
 
 function shuffleGrid() {
@@ -3474,7 +3474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             startBtn.style.display = 'block';
             startBtn.classList.remove('hidden'); // Legacy
-        }, 1000);
+        }, 100); // Reduced delay for faster startup
         
         startBtn.onclick = () => {
             if (splashScreen) {
