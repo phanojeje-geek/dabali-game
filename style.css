@@ -424,6 +424,7 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     transform-style: preserve-3d;
     transform: rotateX(5deg);
     transition: transform 0.5s ease;
+    z-index: 10; /* Ensure board is above background */
 }
 
 #grid {
@@ -438,6 +439,8 @@ body.dark-mode.theme-marche { background: radial-gradient(circle at 50% 30%, #1e
     background: rgba(255, 255, 255, 0.2);
     padding: 5px;
     border-radius: 10px;
+    position: relative;
+    z-index: 20; /* Ensure grid is clickable */
 }
 
 /* Tip banner inside the board */
@@ -539,8 +542,8 @@ body.theme-cocody #game-board {
     box-shadow: 
         0 4px 0 rgba(0,0,0,0.15),
         inset 0 2px 4px rgba(255,255,255,0.8);
-    position: relative;
-    z-index: 10;
+    position: absolute; /* Crucial for animation */
+    z-index: 30; /* Ensure tiles are above grid */
     /* 3D Tile Effect */
     transform: translateZ(0);
     overflow: hidden;

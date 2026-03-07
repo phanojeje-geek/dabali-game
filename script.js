@@ -2444,10 +2444,11 @@ function handleInputStart(e) {
     if (!tile) return;
     
     // --- LONG PRESS LOGIC START ---
-    isLongPressActive = false;
-    longPressTarget = tile;
+    // isLongPressActive = false;
+    // longPressTarget = tile;
     
     // Start timer for 1s (1000ms) long press
+    /*
     longPressTimer = setTimeout(() => {
         isLongPressActive = true;
         // Visual feedback for Long Press Selection
@@ -2462,6 +2463,7 @@ function handleInputStart(e) {
         // But user said: "maintienne l'élément... ensuite sélectionne le marteau ou la main"
         // So we just mark it as selected for now.
     }, 800); // 800ms is usually enough for "long press" feel
+    */
     // --- LONG PRESS LOGIC END ---
 
     // Booster Handling (Legacy direct click logic removed/adapted below)
@@ -2470,13 +2472,11 @@ function handleInputStart(e) {
     // However, we should support both if possible, or strictly follow new rule.
     // Let's support the new rule: Long Press Tile -> then Click Booster.
     
-    if (activeBooster && activeBooster === 'swap' && swapSourceTile) {
-        // This is the second step of Hand (Transformation): Clicking the Source (Neighbor)
-        // This happens AFTER a target was selected.
+    if (activeBooster) {
         if (handleBoosterInput(tile)) {
             e.preventDefault();
             e.stopPropagation();
-            clearTimeout(longPressTimer); // Cancel long press if it was a quick click for action
+            // clearTimeout(longPressTimer); // Cancel long press if it was a quick click for action
             return;
         }
     }
@@ -2496,6 +2496,7 @@ function handleInputStart(e) {
 }
 
 function handleInputEnd(e) {
+    /*
     // Clear long press timer if released too early
     if (longPressTimer) {
         clearTimeout(longPressTimer);
@@ -2507,6 +2508,7 @@ function handleInputEnd(e) {
         isLongPressActive = false;
         return; 
     }
+    */
     
     // ... Existing Swipe Logic ...
     if (!activeTile || isProcessing || isPaused) return;
