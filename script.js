@@ -2336,7 +2336,13 @@ function createGrid(obstacleCount = 0) {
                     const emptyEl = document.createElement('div');
                     emptyEl.className = 'tile-empty';
                     gridEl.appendChild(emptyEl);
-                    row.push(null);
+                    // Create a Hole object instead of null to prevent gravity from filling it
+                    row.push({
+                        r: r,
+                        c: c,
+                        type: { id: 'hole', name: 'Hole' },
+                        el: emptyEl
+                    });
                     continue;
                 }
 
@@ -3037,7 +3043,7 @@ function causesMatch(r, c, typeId, currentRow) {
 }
 
 function isObstacleId(id) {
-    return id === 'crate' || id === 'frozen' || id === 'rock';
+    return id === 'crate' || id === 'frozen' || id === 'rock' || id === 'hole';
 }
 
 function isImmovable(tile) {
@@ -3166,55 +3172,74 @@ async function processMatches(matches) {
 }
 
 async function applyGravity() {
-    // 1. Move tiles down
-    for (let c = 0; c < GRID_SIZE; c++) {
-        let emptySlots = 0;
-        for (let r = GRID_SIZE - 1; r >= 0; r--) {
-            if (grid[r][c] === null) {
-                emptySlots++;
-            } else if (emptySlots > 0) {
-                // Move tile down
-                const tile = grid[r][c];
-                grid[r + emptySlots][c] = tile;
-                grid[r][c] = null;
-                tile.r += emptySlots;
-                
-                // Update Absolute Position
-                const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
-                const gap = 4;
-                tile.el.style.top = (tile.r * (tileSize + gap)) + 'px';
-                tile.el.dataset.r = tile.r;
-                tile.el.classList.add('drop-anim');
+    try {
+        // 1. Move tiles down
+        for (let c = 0; c < GRID_SIZE; c++) {
+            let emptySlots = 0;
+            for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                // Treat 'hole' as a wall: reset emptySlots if we hit a hole
+                if (grid[r][c] && grid[r][c].type.id === 'hole') {
+                    emptySlots = 0; // Reset gravity base
+                    continue;
+                }
+
+                if (grid[r][c] === null) {
+                    emptySlots++;
+                } else if (emptySlots > 0) {
+                    // Move tile down
+                    const tile = grid[r][c];
+                    grid[r + emptySlots][c] = tile;
+                    grid[r][c] = null;
+                    tile.r += emptySlots;
+                    
+                    // Update Absolute Position
+                    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+                    const gap = 4;
+                    if(tile.el) {
+                        tile.el.style.top = (tile.r * (tileSize + gap)) + 'px';
+                        tile.el.dataset.r = tile.r;
+                        tile.el.classList.add('drop-anim');
+                    }
+                }
+            }
+            
+            // 2. Fill top with new tiles
+            // We re-scan from top to find remaining nulls
+            for (let r = 0; r < GRID_SIZE; r++) {
+                // If we hit a hole, we skip it (it's not null)
+                // If we hit a null, it means it's empty space above everything else
+                if (grid[r][c] === null) {
+                    const tileData = createRandomTile(r, c);
+                    grid[r][c] = tileData;
+                    gridEl.appendChild(tileData.el);
+                    
+                    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+                    const gap = 4;
+                    
+                    // Set initial absolute position (above grid)
+                    tileData.el.style.position = 'absolute';
+                    tileData.el.style.width = `${tileSize}px`;
+                    tileData.el.style.height = `${tileSize}px`;
+                    tileData.el.style.left = (c * (tileSize + gap)) + 'px';
+                    tileData.el.style.top = (-1 * (tileSize + gap)) + 'px'; // Start above
+                    tileData.el.style.opacity = '1';
+                    
+                    // Force reflow
+                    tileData.el.offsetHeight;
+                    
+                    // Animate to final position
+                    tileData.el.style.top = (r * (tileSize + gap)) + 'px';
+                    tileData.el.classList.add('drop-anim');
+                } else if (grid[r][c].type.id === 'hole') {
+                    // If we hit a hole, we continue. Tiles above holes are valid.
+                }
             }
         }
         
-        // 2. Fill top with new tiles
-        for (let r = 0; r < emptySlots; r++) {
-            const tileData = createRandomTile(r, c);
-            grid[r][c] = tileData;
-            gridEl.appendChild(tileData.el);
-            
-            const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
-            const gap = 4;
-            
-            // Set initial absolute position (above grid)
-            tileData.el.style.position = 'absolute';
-            tileData.el.style.width = `${tileSize}px`;
-            tileData.el.style.height = `${tileSize}px`;
-            tileData.el.style.left = (c * (tileSize + gap)) + 'px';
-            tileData.el.style.top = (-1 * (tileSize + gap)) + 'px'; // Start above
-            tileData.el.style.opacity = '1';
-            
-            // Force reflow
-            tileData.el.offsetHeight;
-            
-            // Animate to final position
-            tileData.el.style.top = (r * (tileSize + gap)) + 'px';
-            tileData.el.classList.add('drop-anim');
-        }
+        await new Promise(r => setTimeout(r, 300));
+    } catch (e) {
+        console.error("Error in applyGravity:", e);
     }
-    
-    await new Promise(r => setTimeout(r, 300));
 }
 
 async function resolveMatchesLoop() {
