@@ -1589,9 +1589,9 @@ function updateTileSize() {
         
         const containerWidth = gameContainerEl.clientWidth || window.innerWidth;
         // Use a safer height calculation
-        const containerHeight = (window.innerHeight - headerHeight - footerHeight - 20) || 400;
+        const containerHeight = (window.innerHeight - headerHeight - footerHeight - 40) || 400; // Increased margin
         
-        const availableWidth = Math.max(280, containerWidth - 20);
+        const availableWidth = Math.max(280, containerWidth - 30); // More padding
         const availableHeight = Math.max(280, containerHeight);
         
         const gridGap = 4; // Fixed gap
@@ -1600,7 +1600,7 @@ function updateTileSize() {
         // Calculate max square size that fits
         const base = Math.min(availableWidth, availableHeight);
         const raw = Math.floor((base - totalGaps) / GRID_SIZE);
-        const clamped = Math.max(30, Math.min(65, raw)); // Adjusted limits
+        const clamped = Math.max(30, Math.min(60, raw)); // Reduced max size to 60px to prevent overflow
         
         if (!isNaN(clamped)) {
             document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
@@ -1610,7 +1610,8 @@ function updateTileSize() {
                 const totalSize = (clamped * GRID_SIZE) + totalGaps;
                 gridEl.style.height = `${totalSize}px`;
                 gridEl.style.width = `${totalSize}px`;
-                gridEl.style.position = 'relative'; // Crucial for absolute children
+                gridEl.style.position = 'relative'; 
+                gridEl.style.margin = '0 auto'; // Center horizontally
             }
             
             // Update all tiles positions immediately
