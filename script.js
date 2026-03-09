@@ -3165,6 +3165,58 @@ async function processMatches(matches) {
     resolveMatchesLoop();
 }
 
+async function applyGravity() {
+    // 1. Move tiles down
+    for (let c = 0; c < GRID_SIZE; c++) {
+        let emptySlots = 0;
+        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+            if (grid[r][c] === null) {
+                emptySlots++;
+            } else if (emptySlots > 0) {
+                // Move tile down
+                const tile = grid[r][c];
+                grid[r + emptySlots][c] = tile;
+                grid[r][c] = null;
+                tile.r += emptySlots;
+                
+                // Update Absolute Position
+                const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+                const gap = 4;
+                tile.el.style.top = (tile.r * (tileSize + gap)) + 'px';
+                tile.el.dataset.r = tile.r;
+                tile.el.classList.add('drop-anim');
+            }
+        }
+        
+        // 2. Fill top with new tiles
+        for (let r = 0; r < emptySlots; r++) {
+            const tileData = createRandomTile(r, c);
+            grid[r][c] = tileData;
+            gridEl.appendChild(tileData.el);
+            
+            const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+            const gap = 4;
+            
+            // Set initial absolute position (above grid)
+            tileData.el.style.position = 'absolute';
+            tileData.el.style.width = `${tileSize}px`;
+            tileData.el.style.height = `${tileSize}px`;
+            tileData.el.style.left = (c * (tileSize + gap)) + 'px';
+            tileData.el.style.top = (-1 * (tileSize + gap)) + 'px'; // Start above
+            tileData.el.style.opacity = '1';
+            
+            // Force reflow
+            tileData.el.offsetHeight;
+            
+            // Animate to final position
+            tileData.el.style.top = (r * (tileSize + gap)) + 'px';
+            tileData.el.classList.add('drop-anim');
+        }
+    }
+    
+    await new Promise(r => setTimeout(r, 300));
+}
+
 async function resolveMatchesLoop() {
     const newMatches = findMatches();
     if (newMatches.length > 0) {
