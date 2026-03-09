@@ -2449,6 +2449,7 @@ function renderTileContent(el, type) {
         'tile-huile'
     );
     if (type.image) {
+        // Add pointer-events: none to image to ensure clicks pass through to the tile div
         el.innerHTML = `<img src="${type.image}" alt="${type.name}" style="width:80%; height:80%; object-fit:contain; pointer-events:none;">`;
         el.style.fontSize = '';
     } else {
@@ -2472,14 +2473,20 @@ let isLongPressActive = false;
 function handleInputStart(e) {
     if (isProcessing || moves <= 0 || isPaused) return; 
     
+    // Improved target detection
     let target = e.target;
-    while (target && !target.classList.contains('tile') && target !== gridEl) {
+    // Walk up the DOM tree until we find a .tile or hit the grid
+    while (target && target.classList && !target.classList.contains('tile') && target !== gridEl) {
         target = target.parentElement;
     }
-    if (!target || !target.classList.contains('tile')) return;
+    
+    if (!target || !target.classList || !target.classList.contains('tile')) return;
 
     const tile = getTileFromEl(target);
-    if (!tile) return;
+    if (!tile) {
+        console.warn("Input detected on invalid tile element", target);
+        return;
+    }
     
     // --- LONG PRESS LOGIC START ---
     // isLongPressActive = false;
