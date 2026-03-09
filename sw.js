@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dabali-v33';
+const CACHE_NAME = 'dabali-v34';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
