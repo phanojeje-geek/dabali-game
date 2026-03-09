@@ -2528,27 +2528,17 @@ function handleInputStart(e) {
 }
 
 function handleInputEnd(e) {
-    /*
-    // Clear long press timer if released too early
-    if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-    }
-    
-    // If it was a long press, we don't do swipe/click logic
-    if (isLongPressActive) {
-        isLongPressActive = false;
-        return; 
-    }
-    */
-    
-    // ... Existing Swipe Logic ...
     if (!activeTile || isProcessing || isPaused) return;
     
     let clientX, clientY;
     if (e.type === 'touchend') {
-        clientX = e.changedTouches[0].clientX;
-        clientY = e.changedTouches[0].clientY;
+        // Use changedTouches for touchend
+        if (e.changedTouches.length > 0) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            return;
+        }
     } else {
         clientX = e.clientX;
         clientY = e.clientY;
@@ -2568,6 +2558,7 @@ function handleInputEnd(e) {
             targetR += (dy > 0 ? 1 : -1);
         }
         
+        // Ensure within bounds
         if (targetR >= 0 && targetR < GRID_SIZE && targetC >= 0 && targetC < GRID_SIZE) {
             const targetTile = grid[targetR][targetC];
             if (targetTile) {
@@ -2577,20 +2568,31 @@ function handleInputEnd(e) {
         activeTile = null;
     } else {
          // Tap (Click)
+         // Check if it was a real tap (short duration, small movement)
+         // For now, we assume if it's not a swipe, it's a tap.
+         
          // Standard Selection for Swap
          if (selectedTile) {
              if (selectedTile === activeTile) {
+                 // Deselect
                  selectedTile.el.classList.remove('selected');
                  selectedTile = null;
              } else {
-                 attemptSwap(selectedTile, activeTile);
-                 selectedTile.el.classList.remove('selected');
-                 selectedTile = null;
+                 // Check if adjacent for swap
+                 if (Math.abs(selectedTile.r - activeTile.r) + Math.abs(selectedTile.c - activeTile.c) === 1) {
+                     attemptSwap(selectedTile, activeTile);
+                     selectedTile.el.classList.remove('selected');
+                     selectedTile = null;
+                 } else {
+                     // Select new tile
+                     selectedTile.el.classList.remove('selected');
+                     selectedTile = activeTile;
+                     activeTile.el.classList.add('selected');
+                     soundManager.playClick();
+                 }
              }
          } else {
-             // Just a tap, maybe selecting for normal swap?
-             // But wait, if we tap, we didn't long press.
-             // If we just tap, we select for normal move.
+             // First selection
              selectedTile = activeTile;
              activeTile.el.classList.add('selected');
              soundManager.playClick();
@@ -3141,47 +3143,23 @@ async function processMatches(matches) {
     
     await new Promise(r => setTimeout(r, 300));
     
-    // 2. Refill (Gravity)
-    // Removed duplicate declaration of levelConfig
-    const currentLayout = (LEVELS.find(l => l.id === level) || LEVELS[0]).layout;
-
-    for (let c = 0; c < GRID_SIZE; c++) {
-        // Collect types that are staying in this column (not matches, not holes)
-        let stayingTypes = [];
-        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+    // 2. Remove Matches & Apply Gravity
+    
+    // First, remove matched tiles from the grid
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
             const tile = grid[r][c];
-            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
-            if (!isHole && tile && !matches.includes(tile)) {
-                stayingTypes.push(tile.type);
+            if (tile && matches.includes(tile)) {
+                // Remove visual element
+                if (tile.el && tile.el.parentNode) {
+                    tile.el.parentNode.removeChild(tile.el);
+                }
+                grid[r][c] = null; // Mark as empty
             }
-        }
-
-        // Fill slots from bottom to top
-        let stayingIdx = 0;
-        for (let r = GRID_SIZE - 1; r >= 0; r--) {
-            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
-            if (isHole) continue;
-
-            if (stayingIdx < stayingTypes.length) {
-                grid[r][c].type = stayingTypes[stayingIdx++];
-            } else {
-                // New tile
-                grid[r][c].type = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
-                
-                // Drop animation for new tiles
-                grid[r][c].el.classList.remove('drop-anim');
-                void grid[r][c].el.offsetWidth;
-                grid[r][c].el.classList.add('drop-anim');
-            }
-
-            // Render the updated tile
-            grid[r][c].el.className = 'tile';
-            renderTileContent(grid[r][c].el, grid[r][c].type);
-            if (isObstacleId(grid[r][c].type.id)) grid[r][c].el.classList.add('obstacle');
         }
     }
     
-    await new Promise(r => setTimeout(r, 200));
+    await applyGravity();
     
     // 3. Check for new matches (Chain reaction)
     resolveMatchesLoop();
