@@ -1577,51 +1577,54 @@ function updateTileSize() {
     try {
         if (!gameBoardEl || !gameContainerEl) return;
         
-        const headerHeight = headerEl ? headerEl.offsetHeight : 0;
-        const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 0;
+        // Ensure container has dimensions
+        if (gameContainerEl.clientWidth === 0 || gameContainerEl.clientHeight === 0) {
+            // Retry shortly if not ready
+            setTimeout(updateTileSize, 100);
+            return;
+        }
         
-        const containerWidth = gameContainerEl.clientWidth || window.innerWidth || 320;
-        const containerHeight = gameContainerEl.clientHeight || window.innerHeight || 568;
+        const headerHeight = headerEl ? headerEl.offsetHeight : 60;
+        const footerHeight = footerGoalsEl ? footerGoalsEl.offsetHeight : 100;
         
-        const availableWidth = Math.max(140, containerWidth - 16);
-        const availableHeight = Math.max(140, containerHeight - headerHeight - footerHeight - 16);
+        const containerWidth = gameContainerEl.clientWidth || window.innerWidth;
+        // Use a safer height calculation
+        const containerHeight = (window.innerHeight - headerHeight - footerHeight - 20) || 400;
         
-        const boardStyles = window.getComputedStyle(gameBoardEl);
-        const borderW = parseFloat(boardStyles.borderLeftWidth) || 0;
-        const paddingW = parseFloat(boardStyles.paddingLeft) || 0;
+        const availableWidth = Math.max(280, containerWidth - 20);
+        const availableHeight = Math.max(280, containerHeight);
         
-        const gridGap = gridEl ? (parseFloat(window.getComputedStyle(gridEl).gap) || 4) : 4;
+        const gridGap = 4; // Fixed gap
         const totalGaps = gridGap * (GRID_SIZE - 1);
         
-        const maxBoardWidth = Math.max(120, availableWidth - (borderW * 2) - (paddingW * 2));
-        const maxBoardHeight = Math.max(120, availableHeight - (borderW * 2) - (paddingW * 2));
-        
-        const base = Math.min(maxBoardWidth, maxBoardHeight);
+        // Calculate max square size that fits
+        const base = Math.min(availableWidth, availableHeight);
         const raw = Math.floor((base - totalGaps) / GRID_SIZE);
-        const clamped = Math.max(20, Math.min(72, raw));
+        const clamped = Math.max(30, Math.min(65, raw)); // Adjusted limits
         
         if (!isNaN(clamped)) {
             document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
             
             // Set Grid Height explicitely for Absolute Positioning
             if (gridEl) {
-                const totalH = (clamped * GRID_SIZE) + totalGaps;
-                gridEl.style.height = `${totalH}px`;
-                gridEl.style.width = `${totalH}px`; // Square grid
+                const totalSize = (clamped * GRID_SIZE) + totalGaps;
+                gridEl.style.height = `${totalSize}px`;
+                gridEl.style.width = `${totalSize}px`;
+                gridEl.style.position = 'relative'; // Crucial for absolute children
             }
             
-            // Update all tiles positions
+            // Update all tiles positions immediately
             const tiles = document.querySelectorAll('.tile');
             tiles.forEach(t => {
                 const r = parseInt(t.dataset.r);
                 const c = parseInt(t.dataset.c);
                 if (!isNaN(r) && !isNaN(c)) {
-                    // Force absolute position update
-                    const gap = gridGap || 4; // Fallback
-                    const size = clamped;
                     t.style.position = 'absolute';
-                    t.style.top = `${r * (size + gap)}px`;
-                    t.style.left = `${c * (size + gap)}px`;
+                    t.style.width = `${clamped}px`;
+                    t.style.height = `${clamped}px`;
+                    t.style.top = `${r * (clamped + gridGap)}px`;
+                    t.style.left = `${c * (clamped + gridGap)}px`;
+                    t.style.opacity = '1'; // Force visible
                 }
             });
         }

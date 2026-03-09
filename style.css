@@ -528,7 +528,7 @@ body.theme-cocody #game-board {
 }
 
 .tile {
-    width: var(--tile-size, 40px);
+    width: var(--tile-size, 40px); /* Fallback */
     height: var(--tile-size, 40px);
     background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 0.9) 100%);
     border-radius: 12px;
@@ -547,6 +547,8 @@ body.theme-cocody #game-board {
     /* 3D Tile Effect */
     transform: translateZ(0);
     overflow: hidden;
+    min-width: 30px; /* Safety min size */
+    min-height: 30px;
 }
 
 /* Glossy highlight */
