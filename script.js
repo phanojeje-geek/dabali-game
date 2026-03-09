@@ -1602,6 +1602,28 @@ function updateTileSize() {
         
         if (!isNaN(clamped)) {
             document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
+            
+            // Set Grid Height explicitely for Absolute Positioning
+            if (gridEl) {
+                const totalH = (clamped * GRID_SIZE) + totalGaps;
+                gridEl.style.height = `${totalH}px`;
+                gridEl.style.width = `${totalH}px`; // Square grid
+            }
+            
+            // Update all tiles positions
+            const tiles = document.querySelectorAll('.tile');
+            tiles.forEach(t => {
+                const r = parseInt(t.dataset.r);
+                const c = parseInt(t.dataset.c);
+                if (!isNaN(r) && !isNaN(c)) {
+                    // Force absolute position update
+                    const gap = gridGap || 4; // Fallback
+                    const size = clamped;
+                    t.style.position = 'absolute';
+                    t.style.top = `${r * (size + gap)}px`;
+                    t.style.left = `${c * (size + gap)}px`;
+                }
+            });
         }
     } catch (e) {
         console.error("Error in updateTileSize:", e);
@@ -2327,10 +2349,16 @@ function createGrid(obstacleCount = 0) {
                 
                 row.push(tile);
                 gridEl.appendChild(tile.el);
+                
+                // Initial positioning (will be refined by updateTileSize)
+                // We rely on updateTileSize being called after or during init
             }
             grid.push(row);
         }
         console.log(`[DEBUG] Grid created successfully. Tiles in gridEl: ${gridEl.childElementCount}`);
+        
+        // Force update size and positions
+        setTimeout(() => updateTileSize(), 50);
 
         // 2. Place Obstacles
         let placed = 0;
