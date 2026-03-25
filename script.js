@@ -3161,63 +3161,7 @@ function findMatches() {
         checkRun(run, 'col');
     }
     
-    // 2. Special Recipe Matches (Heterogeneous)
-    // Horizontal
-    for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE - 2; c++) {
-            const tilesToCheck = [grid[r][c], grid[r][c+1], grid[r][c+2]];
-            if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
-                tilesToCheck.forEach(t => matches.add(t));
-                showBonDabali(); // Recipe always triggers Bon Dabali
-                
-                // Recipe Explosion
-                const center = tilesToCheck[1];
-                const surrounding = [];
-                for(let dr=-1; dr<=1; dr++) {
-                    for(let dc=-1; dc<=1; dc++) {
-                        const nr = center.r + dr;
-                        const nc = center.c + dc;
-                        if(nr>=0 && nr<GRID_SIZE && nc>=0 && nc<GRID_SIZE) {
-                            const neighbor = grid[nr][nc];
-                            if(neighbor && !tilesToCheck.includes(neighbor)) {
-                                matches.add(neighbor);
-                                surrounding.push(neighbor);
-                            }
-                        }
-                    }
-                }
-                triggerExplosionEffect(center, surrounding);
-            }
-        }
-    }
-    // Vertical
-    for (let c = 0; c < GRID_SIZE; c++) {
-        for (let r = 0; r < GRID_SIZE - 2; r++) {
-            const tilesToCheck = [grid[r][c], grid[r+1][c], grid[r+2][c]];
-            if (tilesToCheck.every(t => t) && checkRecipe(tilesToCheck)) {
-                tilesToCheck.forEach(t => matches.add(t));
-                showBonDabali();
-                
-                // Recipe Explosion
-                const center = tilesToCheck[1];
-                const surrounding = [];
-                for(let dr=-1; dr<=1; dr++) {
-                    for(let dc=-1; dc<=1; dc++) {
-                        const nr = center.r + dr;
-                        const nc = center.c + dc;
-                        if(nr>=0 && nr<GRID_SIZE && nc>=0 && nc<GRID_SIZE) {
-                            const neighbor = grid[nr][nc];
-                            if(neighbor && !tilesToCheck.includes(neighbor)) {
-                                matches.add(neighbor);
-                                surrounding.push(neighbor);
-                            }
-                        }
-                    }
-                }
-                triggerExplosionEffect(center, surrounding);
-            }
-        }
-    }
+    // 2. Special Recipe Matches (Heterogeneous) — disabled to enforce strict same-type matches
     
     // 3. Handle Obstacle Destruction (Adjacent to matches)
     const currentMatches = Array.from(matches);
@@ -3271,18 +3215,12 @@ function causesMatch(r, c, typeId, currentRow) {
         const t1 = currentRow[c-1];
         const t2 = currentRow[c-2];
         if (t1 && t2 && t1.type.id === typeId && t2.type.id === typeId) return true;
-        
-        // Check Recipe Horizontal (potential)
-        if (t1 && t2 && checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
     }
     // Check Vertical (Up)
     if (r >= 2) {
         const t1 = grid[r-1][c];
         const t2 = grid[r-2][c];
         if (t1 && t2 && t1.type.id === typeId && t2.type.id === typeId) return true;
-        
-        // Check Recipe Vertical
-        if (t1 && t2 && checkRecipe([{type:{id:t2.type.id}}, {type:{id:t1.type.id}}, {type:{id:typeId}}])) return true;
     }
     return false;
 }
