@@ -2102,7 +2102,11 @@ function startLevel(lvl, resume = false) {
         applyThemeForLevel(level);
         localStorage.setItem(STORAGE_KEYS.currentLevel, String(level));
         score = 0;
-        moves = levelConfig.moves;
+        // Dynamic difficulty scaling
+        // Base moves reduced slightly with progression
+        const baseMoves = levelConfig.moves;
+        const movesPenalty = Math.floor((level - 1) / 5); // -1 move every 5 levels
+        moves = Math.max(10, baseMoves - movesPenalty);
         isProcessing = false; // Reset processing flag
         isPaused = false; // Reset pause flag
         
@@ -2117,7 +2121,13 @@ function startLevel(lvl, resume = false) {
             console.warn("[DEBUG] No goals defined for this level, using empty object");
             currentGoals = {};
         } else {
-            currentGoals = { ...levelConfig.goals };
+            // Scale goals +10% every 5 levels
+            const scale = 1 + (Math.floor((level - 1) / 5) * 0.1);
+            currentGoals = {};
+            for (let k in levelConfig.goals) {
+                const v = levelConfig.goals[k];
+                currentGoals[k] = Math.max(5, Math.round(v * scale));
+            }
         }
         goalProgress = {};
         for (let k in currentGoals) goalProgress[k] = 0;
@@ -2130,7 +2140,10 @@ function startLevel(lvl, resume = false) {
         
         // Create Grid
         console.log("[DEBUG] Creating grid...");
-        const obstacleCount = levelConfig.obstacles ? levelConfig.obstacles.count : 0;
+        // Increase obstacles with progression
+        const baseObstacles = levelConfig.obstacles ? levelConfig.obstacles.count : 0;
+        const extraObstacles = Math.floor(level / 4); // +1 every 4 levels
+        const obstacleCount = baseObstacles + extraObstacles;
         createGrid(obstacleCount);
         resetHintTimer();
         
@@ -3495,6 +3508,15 @@ function checkGameEnd() {
                 const stars = computeStars(score, levelConfig);
                 saveBestScoreAndStars(level, score, stars);
                 updateModalStars(stars);
+
+                // Reward: +1 combo gratuit si 3 étoiles
+                if (stars === 3) {
+                    freeSuperCombos += 1;
+                    localStorage.setItem(STORAGE_KEYS.freeSuperCombos, String(freeSuperCombos));
+                    updateFreeSuperDisplay();
+                    showFloatingText(window.innerWidth/2, window.innerHeight/2 - 80, '+1 COMBO', '#00FF7F');
+                }
+
                 const maxUnlocked = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
                 const previousMax = Number.isFinite(maxUnlocked) ? maxUnlocked : 1;
                 const newMax = Math.max(previousMax, level + 1);
