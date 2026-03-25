@@ -255,25 +255,62 @@ function bombBlast(centerTile) {
 }
 
 function lineClearRow(r) {
+    showLightningBeam('row', r);
     const tiles = [];
     for (let c = 0; c < GRID_SIZE; c++) {
         const t = grid[r][c];
         if (t) tiles.push(t);
     }
-    soundManager.playExplosion();
+    soundManager.playImpact();
     vibrate([40, 40]);
     processMatches(tiles);
 }
 
 function lineClearCol(c) {
+    showLightningBeam('col', c);
     const tiles = [];
     for (let r = 0; r < GRID_SIZE; r++) {
         const t = grid[r][c];
         if (t) tiles.push(t);
     }
-    soundManager.playExplosion();
+    soundManager.playImpact();
     vibrate([40, 40]);
     processMatches(tiles);
+}
+
+function showLightningBeam(orientation, index) {
+    if (!gridEl) return;
+    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+    const gap = 4;
+    const rect = gridEl.getBoundingClientRect();
+
+    const beam = document.createElement('div');
+    beam.style.position = 'fixed';
+    beam.style.background = 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(173,216,230,0.9) 50%, rgba(255,255,255,0) 100%)';
+    beam.style.boxShadow = '0 0 25px rgba(135,206,250,0.9), 0 0 8px rgba(255,255,255,0.9) inset';
+    beam.style.pointerEvents = 'none';
+    beam.style.zIndex = '9000';
+
+    if (orientation === 'row') {
+        const top = rect.top + 8 + (index * (tileSize + gap)) + tileSize / 2 - 6;
+        beam.style.top = `${top}px`;
+        beam.style.left = `${rect.left}px`;
+        beam.style.width = `${rect.width}px`;
+        beam.style.height = '12px';
+    } else {
+        const left = rect.left + 8 + (index * (tileSize + gap)) + tileSize / 2 - 6;
+        beam.style.left = `${left}px`;
+        beam.style.top = `${rect.top}px`;
+        beam.style.width = '12px';
+        beam.style.height = `${rect.height}px`;
+    }
+
+    document.body.appendChild(beam);
+    beam.animate([
+        { opacity: 0, transform: 'scale(0.8)' },
+        { opacity: 1, transform: 'scale(1)' },
+        { opacity: 0, transform: 'scale(1.1)' }
+    ], { duration: 300, easing: 'ease-out' }).onfinish = () => beam.remove();
 }
 
 function crossBlast(centerTile) {
