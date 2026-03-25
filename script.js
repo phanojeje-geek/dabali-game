@@ -36,21 +36,21 @@ const STORAGE_KEYS = {
 // ... (Existing code)
 
 // BOOSTERS LOGIC
-let activeBooster = null; // 'hammer', 'swap', or null
+let activeBooster = null; // 'bomb', 'lightning', 'shuffle', or null
 let swapSourceTile = null;
 let selectedTile = null; // Defined here once
 
 // Booster State Management
 const BOOSTER_CONFIG = {
-    hammer: { max: 3, current: 3 },
-    swap: { max: 3, current: 3 }, // Now "Transform"
+    bomb: { max: 3, current: 3 },
+    lightning: { max: 3, current: 3 },
     shuffle: { max: 2, current: 2, cooldown: 0, lastUsed: 0 }
 };
 
 function initBoosterState() {
     // Reset boosters per level based on rules
-    BOOSTER_CONFIG.hammer.current = 3;
-    BOOSTER_CONFIG.swap.current = 3; // Fixed to 3
+    BOOSTER_CONFIG.bomb.current = 3;
+    BOOSTER_CONFIG.lightning.current = 3;
     
     if (level >= 10) {
         BOOSTER_CONFIG.shuffle.max = 2;
@@ -82,26 +82,19 @@ function activateBooster(type) {
     // --- NEW LOGIC: Check for Long-Pressed Target ---
     const target = document.querySelector('.tile.selected-booster-target');
     
-    if (target && (type === 'hammer' || type === 'swap')) {
+    if (target && (type === 'bomb' || type === 'lightning')) {
         const tile = getTileFromEl(target);
         if (tile) {
             // Apply immediately
-            if (type === 'hammer') {
-                destroyTile(tile);
-                useBooster('hammer');
+            if (type === 'bomb') {
+                bombBlast(tile);
+                useBooster('bomb');
                 target.classList.remove('selected-booster-target');
                 activeBooster = null; // Reset active booster
                 updateBoostersUI();
                 return;
             }
-            if (type === 'swap') { // Hand = Cross Blast
-                activeBooster = 'swap';
-                crossBlast(tile);
-                target.classList.remove('selected-booster-target');
-                activeBooster = null;
-                updateBoostersUI();
-                return;
-            }
+            // lightning requires direction; fall through to activation message
         }
     }
     // --- END NEW LOGIC ---
@@ -128,33 +121,24 @@ function activateBooster(type) {
     vibrate(50);
     
     let msg = '';
-    if (type === 'hammer') msg = '🔨 Mode Marteau : Touche une case pour la détruire !';
-    if (type === 'swap') msg = '✋ Mode Main : Touche une case pour balayer sa ligne et sa colonne !';
+    if (type === 'bomb') msg = '💣 Mode Bombe : Touche une case pour exploser en 3x3 !';
+    if (type === 'lightning') msg = '⚡ Mode Foudre : Swipe horizontal pour la ligne, vertical pour la colonne !';
     showToast(msg);
 }
 
 function handleBoosterInput(tile) {
     if (!activeBooster) return false;
 
-    if (activeBooster === 'hammer') {
+    if (activeBooster === 'bomb') {
         if (!tile) return false;
-        destroyTile(tile);
-        useBooster('hammer');
+        bombBlast(tile);
+        useBooster('bomb');
         activeBooster = null;
         updateBoostersUI();
         return true;
     }
 
-    if (activeBooster === 'swap') { // Hand = Cross Blast
-        if (!tile) return false;
-        
-        crossBlast(tile);
-        
-        activeBooster = null; // Reset booster state
-        updateBoostersUI();
-        
-        return true;
-    }
+    // lightning is applied in swipe handler (directional)
 
     return false;
 }
@@ -204,9 +188,9 @@ function updateBoostersUI() {
     boosters.forEach(b => {
         const title = b.getAttribute('title');
         let type = '';
-        if (title === 'Marteau') type = 'hammer';
+        if (title === 'Bombe') type = 'bomb';
         else if (title === 'Mélange') type = 'shuffle';
-        else if (title === 'Main') type = 'swap';
+        else if (title === 'Foudre') type = 'lightning';
         
         if (!type) return;
         
@@ -250,6 +234,46 @@ function updateBoostersUI() {
             }
         }
     });
+}
+
+function bombBlast(centerTile) {
+    if (!centerTile) return;
+    const tiles = [];
+    for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+            const nr = centerTile.r + dr;
+            const nc = centerTile.c + dc;
+            if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                const t = grid[nr][nc];
+                if (t) tiles.push(t);
+            }
+        }
+    }
+    soundManager.playExplosion();
+    vibrate([60, 40, 60]);
+    processMatches(tiles);
+}
+
+function lineClearRow(r) {
+    const tiles = [];
+    for (let c = 0; c < GRID_SIZE; c++) {
+        const t = grid[r][c];
+        if (t) tiles.push(t);
+    }
+    soundManager.playExplosion();
+    vibrate([40, 40]);
+    processMatches(tiles);
+}
+
+function lineClearCol(c) {
+    const tiles = [];
+    for (let r = 0; r < GRID_SIZE; r++) {
+        const t = grid[r][c];
+        if (t) tiles.push(t);
+    }
+    soundManager.playExplosion();
+    vibrate([40, 40]);
+    processMatches(tiles);
 }
 
 function crossBlast(centerTile) {
@@ -1876,11 +1900,25 @@ function initGame() {
             b.addEventListener('click', (e) => {
                 e.stopPropagation(); // Prevent grid click
                 const title = b.getAttribute('title');
-                if (title === 'Marteau') activateBooster('hammer');
+                if (title === 'Bombe') activateBooster('bomb');
                 else if (title === 'Mélange') activateBooster('shuffle');
-                else if (title === 'Main') activateBooster('swap');
+                else if (title === 'Foudre') activateBooster('lightning');
             });
         });
+
+        // Event delegation fallback in case boosters are rendered later
+        const boostersContainer = document.querySelector('.boosters-container');
+        if (boostersContainer) {
+            boostersContainer.addEventListener('click', (e) => {
+                const item = e.target.closest('.booster-item');
+                if (!item) return;
+                e.stopPropagation();
+                const title = item.getAttribute('title');
+                if (title === 'Bombe') activateBooster('bomb');
+                else if (title === 'Mélange') activateBooster('shuffle');
+                else if (title === 'Foudre') activateBooster('lightning');
+            });
+        }
 
         if (promoCodeBtn && promoModalOverlay && promoCodeInput && promoSubmitBtn) {
             promoCodeBtn.addEventListener('click', () => {
@@ -2578,6 +2616,20 @@ function handleInputEnd(e) {
     
     // Threshold for swipe
     if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        // Directional booster: lightning
+        if (activeBooster === 'lightning') {
+            if (Math.abs(dx) > Math.abs(dy)) {
+                lineClearRow(activeTile.r);
+            } else {
+                lineClearCol(activeTile.c);
+            }
+            useBooster('lightning');
+            activeBooster = null;
+            updateBoostersUI();
+            activeTile = null;
+            return;
+        }
+
         let targetR = activeTile.r;
         let targetC = activeTile.c;
         
@@ -2600,7 +2652,12 @@ function handleInputEnd(e) {
 
          // If a booster is active, apply it on tap and exit
          if (activeBooster) {
-             handleBoosterInput(activeTile);
+             // bomb applies on tap; lightning requires swipe message
+             if (activeBooster === 'bomb') {
+                 handleBoosterInput(activeTile);
+             } else if (activeBooster === 'lightning') {
+                 showToast('⚡ Swipe: horizontal=ligne, vertical=colonne');
+             }
              activeTile = null;
              return;
          }
