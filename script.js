@@ -3661,7 +3661,7 @@ function updateUI() {
     // Progress Bar and Stars
     const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
     const base = levelConfig.moves || 1;
-    const threeStarsScore = base * 30;
+    const threeStarsScore = base * 60; // Slower fill: higher target
     const progressPercent = Math.min(100, (score / threeStarsScore) * 100);
     
     if (scoreProgressEl) {
@@ -3696,9 +3696,9 @@ function updateUI() {
 
 function computeStars(currentScore, levelConfig) {
     const base = levelConfig.moves || 1;
-    const oneStar = base * 10;
-    const twoStars = base * 20;
-    const threeStars = base * 30;
+    const oneStar = base * 20;
+    const twoStars = base * 40;
+    const threeStars = base * 60;
     if (currentScore >= threeStars) return 3;
     if (currentScore >= twoStars) return 2;
     if (currentScore >= oneStar) return 1;
