@@ -2436,6 +2436,16 @@ function createRandomTile(r, c) {
     renderTileContent(el, type);
     el.dataset.r = r;
     el.dataset.c = c;
+
+    // Initial absolute positioning to avoid stacking at (0,0)
+    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+    const gap = 4;
+    el.style.position = 'absolute';
+    el.style.width = `${tileSize}px`;
+    el.style.height = `${tileSize}px`;
+    el.style.top = `${r * (tileSize + gap)}px`;
+    el.style.left = `${c * (tileSize + gap)}px`;
+    el.style.opacity = '1';
     
     // Events
     el.addEventListener('mousedown', handleInputStart);
@@ -2587,6 +2597,14 @@ function handleInputEnd(e) {
         activeTile = null;
     } else {
          // Tap (Click)
+
+         // If a booster is active, apply it on tap and exit
+         if (activeBooster) {
+             handleBoosterInput(activeTile);
+             activeTile = null;
+             return;
+         }
+
          // Check if it was a real tap (short duration, small movement)
          // For now, we assume if it's not a swipe, it's a tap.
          
