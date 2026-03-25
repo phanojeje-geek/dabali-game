@@ -256,6 +256,7 @@ function bombBlast(centerTile) {
 
 function lineClearRow(r) {
     showLightningBeam('row', r);
+    showLightningBolt('row', r);
     const tiles = [];
     for (let c = 0; c < GRID_SIZE; c++) {
         const t = grid[r][c];
@@ -268,6 +269,7 @@ function lineClearRow(r) {
 
 function lineClearCol(c) {
     showLightningBeam('col', c);
+    showLightningBolt('col', c);
     const tiles = [];
     for (let r = 0; r < GRID_SIZE; r++) {
         const t = grid[r][c];
@@ -292,16 +294,16 @@ function showLightningBeam(orientation, index) {
     beam.style.zIndex = '9000';
 
     if (orientation === 'row') {
-        const top = rect.top + 8 + (index * (tileSize + gap)) + tileSize / 2 - 6;
+        const top = rect.top + 8 + (index * (tileSize + gap)) + tileSize / 2 - 9;
         beam.style.top = `${top}px`;
         beam.style.left = `${rect.left}px`;
         beam.style.width = `${rect.width}px`;
-        beam.style.height = '12px';
+        beam.style.height = '18px';
     } else {
-        const left = rect.left + 8 + (index * (tileSize + gap)) + tileSize / 2 - 6;
+        const left = rect.left + 8 + (index * (tileSize + gap)) + tileSize / 2 - 9;
         beam.style.left = `${left}px`;
         beam.style.top = `${rect.top}px`;
-        beam.style.width = '12px';
+        beam.style.width = '18px';
         beam.style.height = `${rect.height}px`;
     }
 
@@ -310,9 +312,76 @@ function showLightningBeam(orientation, index) {
         { opacity: 0, transform: 'scale(0.8)' },
         { opacity: 1, transform: 'scale(1)' },
         { opacity: 0, transform: 'scale(1.1)' }
-    ], { duration: 300, easing: 'ease-out' }).onfinish = () => beam.remove();
+    ], { duration: 450, easing: 'ease-out' }).onfinish = () => beam.remove();
 }
 
+function showLightningBolt(orientation, index) {
+    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+    const gap = 4;
+    const rect = gridEl.getBoundingClientRect();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svg.style.position = 'fixed';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '9001';
+    let w, h, top, left;
+    if (orientation === 'row') {
+        w = rect.width;
+        h = 32;
+        top = rect.top + 8 + (index * (tileSize + gap)) + tileSize / 2 - h/2;
+        left = rect.left;
+    } else {
+        w = 32;
+        h = rect.height;
+        top = rect.top;
+        left = rect.left + 8 + (index * (tileSize + gap)) + tileSize / 2 - w/2;
+    }
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.style.top = `${top}px`;
+    svg.style.left = `${left}px`;
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('stroke', '#fff200');
+    poly.setAttribute('stroke-width', '6');
+    poly.setAttribute('stroke-linejoin', 'round');
+    poly.setAttribute('stroke-linecap', 'round');
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    glow.setAttribute('fill', 'none');
+    glow.setAttribute('stroke', '#9ae1ff');
+    glow.setAttribute('stroke-width', '10');
+    glow.setAttribute('stroke-linejoin', 'round');
+    glow.setAttribute('stroke-linecap', 'round');
+    let points = '';
+    if (orientation === 'row') {
+        const segments = 8;
+        const step = w / segments;
+        for (let i = 0; i <= segments; i++) {
+            const x = i * step;
+            const y = (i % 2 === 0) ? h*0.25 : h*0.75;
+            points += `${x},${y} `;
+        }
+    } else {
+        const segments = 8;
+        const step = h / segments;
+        for (let i = 0; i <= segments; i++) {
+            const y = i * step;
+            const x = (i % 2 === 0) ? w*0.25 : w*0.75;
+            points += `${x},${y} `;
+        }
+    }
+    poly.setAttribute('points', points.trim());
+    glow.setAttribute('points', points.trim());
+    svg.appendChild(glow);
+    svg.appendChild(poly);
+    document.body.appendChild(svg);
+    const anim = svg.animate([
+        { opacity: 0.0 },
+        { opacity: 1.0 },
+        { opacity: 0.0 }
+    ], { duration: 350, easing: 'ease-out' });
+    anim.onfinish = () => svg.remove();
+}
 function crossBlast(centerTile) {
     if (!centerTile) return;
     
@@ -954,21 +1023,59 @@ function getLevelGroupName(levelId) {
     return "Dabali de Côte d'Ivoire";
 }
 
+function renderAmbient(themeClass) {
+    const layer = document.getElementById('ambient-layer');
+    if (!layer) return;
+    layer.innerHTML = '';
+    const back = document.createElement('div');
+    const mid = document.createElement('div');
+    const front = document.createElement('div');
+    back.className = 'ambient-back';
+    mid.className = 'ambient-mid';
+    front.className = 'ambient-front';
+    layer.appendChild(back);
+    layer.appendChild(mid);
+    layer.appendChild(front);
+    if (themeClass === 'theme-garba') {
+        const leaves = document.createElement('div');
+        leaves.className = 'ambient-leaves';
+        mid.appendChild(leaves);
+    } else if (themeClass === 'theme-yopougon') {
+        const wave1 = document.createElement('div');
+        const wave2 = document.createElement('div');
+        wave1.className = 'ambient-wave';
+        wave2.className = 'ambient-wave wave2';
+        mid.appendChild(wave1);
+        mid.appendChild(wave2);
+    } else if (themeClass === 'theme-cocody') {
+        const skyline = document.createElement('div');
+        skyline.className = 'ambient-skyline';
+        back.appendChild(skyline);
+        for (let i = 0; i < 8; i++) {
+            const light = document.createElement('div');
+            light.className = 'ambient-light';
+            light.style.left = Math.random() * 100 + '%';
+            light.style.top = (Math.random() * 40 + 10) + 'px';
+            light.style.animationDelay = (Math.random() * 2) + 's';
+            front.appendChild(light);
+        }
+    } else if (themeClass === 'theme-treichville') {
+        const market = document.createElement('div');
+        market.className = 'ambient-market';
+        mid.appendChild(market);
+    } else {
+        const dots = document.createElement('div');
+        dots.className = 'ambient-dots';
+        front.appendChild(dots);
+    }
+}
 function applyThemeForLevel(levelId) {
-    document.body.classList.remove(
-        'theme-garba',
-        'theme-yopougon',
-        'theme-cocody',
-        'theme-treichville',
-        'theme-marche'
-    );
-    if (levelId <= 10) document.body.classList.add('theme-garba');
-    else if (levelId <= 20) document.body.classList.add('theme-yopougon');
-    else if (levelId <= 40) document.body.classList.add('theme-cocody');
-    else if (levelId <= 60) document.body.classList.add('theme-treichville');
-    else document.body.classList.add('theme-marche');
-    
-    if (typeof ambientManager !== 'undefined') ambientManager.update(levelId);
+    const themes = ['theme-garba','theme-yopougon','theme-cocody','theme-treichville','theme-marche'];
+    const idx = Math.floor((levelId - 1) / 2) % themes.length;
+    const themeClass = themes[idx];
+    document.body.classList.remove('theme-garba','theme-yopougon','theme-cocody','theme-treichville','theme-marche');
+    document.body.classList.add(themeClass);
+    renderAmbient(themeClass);
 }
 
 // STATE
