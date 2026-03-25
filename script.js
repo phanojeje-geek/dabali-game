@@ -926,10 +926,10 @@ let freeSuperCombos = 0;
 let comboCount = 0;
 
 let timerInterval = null;
-// let avatarEl = null; // Removed
-// let avatarState = 'neutral';
-// let avatarIdleTimeout = null;
-// let avatarLimbsEl = null;
+let avatarEl = null;
+let avatarState = 'neutral';
+let avatarIdleTimeout = null;
+let avatarLimbsEl = null;
 let timeRemaining = 90; // 1m30s
 let isPaused = false;
 let hintTimeout = null;
@@ -1436,7 +1436,7 @@ function redeemPromoCode() {
 }
 
 function setAvatarMood(state) {
-    if (!avatarEl) return;
+    if (typeof avatarEl === 'undefined' || !avatarEl) return;
     avatarState = state;
     avatarEl.className = '';
     avatarEl.classList.add('avatar-face');
@@ -1450,10 +1450,10 @@ function setAvatarMood(state) {
         spawnAvatarThrow();
     }
     if (state === 'bored') avatarEl.classList.add('avatar-bored');
-    if (avatarLimbsEl) {
+    if (typeof avatarLimbsEl !== 'undefined' && avatarLimbsEl) {
         avatarLimbsEl.style.transform = state === 'happy' ? 'translateY(-4px)' : state === 'angry' ? 'rotate(-3deg)' : '';
     }
-    if (avatarIdleTimeout) clearTimeout(avatarIdleTimeout);
+    if (typeof avatarIdleTimeout !== 'undefined' && avatarIdleTimeout) clearTimeout(avatarIdleTimeout);
     avatarIdleTimeout = setTimeout(() => {
         setAvatarMood('neutral');
     }, 4000);
@@ -3180,23 +3180,45 @@ async function processMatches(matches) {
     
     await new Promise(r => setTimeout(r, 300));
     
-    // 2. Remove Matches & Apply Gravity
+    // 2. Simulate Gravity by shifting TYPES down per column (keep DOM nodes for stability)
+    const currentLayout = (LEVELS.find(l => l.id === level) || LEVELS[0]).layout;
     
-    // First, remove matched tiles from the grid
-    for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+        // Collect types that will stay (skip matched tiles and holes)
+        const stayingTypes = [];
+        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
             const tile = grid[r][c];
-            if (tile && matches.includes(tile)) {
-                // Remove visual element
-                if (tile.el && tile.el.parentNode) {
-                    tile.el.parentNode.removeChild(tile.el);
-                }
-                grid[r][c] = null; // Mark as empty
+            if (isHole) continue;
+            if (tile && !matches.includes(tile)) {
+                stayingTypes.push(tile.type);
             }
         }
+        
+        // Fill from bottom to top
+        let idx = 0;
+        for (let r = GRID_SIZE - 1; r >= 0; r--) {
+            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
+            if (isHole) continue;
+            
+            const targetTile = grid[r][c];
+            if (!targetTile) continue;
+            
+            if (idx < stayingTypes.length) {
+                targetTile.type = stayingTypes[idx++];
+            } else {
+                // New tile type
+                const newType = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+                targetTile.type = newType;
+            }
+            
+            // Render and animate drop
+            targetTile.el.classList.remove('drop-anim');
+            void targetTile.el.offsetWidth;
+            renderTileContent(targetTile.el, targetTile.type);
+            targetTile.el.classList.add('drop-anim');
+        }
     }
-    
-    await applyGravity();
     
     // 3. Check for new matches (Chain reaction)
     resolveMatchesLoop();
