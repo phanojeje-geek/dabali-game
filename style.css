@@ -642,12 +642,10 @@ body.theme-cocody #game-board {
     width: var(--tile-size, 40px); /* Fallback */
     height: var(--tile-size, 40px);
     background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 0.9) 100%);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 0.9) 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     font-size: calc(var(--tile-size, 40px) * 0.7);
-    font-size: 2.6rem;
     user-select: none;
     transition: transform 0.2s, background-color 0.2s, opacity 0.2s;
     box-shadow: 
@@ -660,13 +658,12 @@ body.theme-cocody #game-board {
     overflow: hidden;
     min-width: 30px; /* Safety min size */
     min-height: 30px;
-}
     filter: saturate(1.25) contrast(1.08);
+}
 
 /* Glossy highlight */
 .tile::after {
     content: '';
-    position: absolute;
     position: absolute;
     top: 5%;
     left: 10%;
@@ -727,14 +724,6 @@ body.theme-cocody #game-board {
     filter: saturate(1.3) contrast(1.1);
 }
 
-/* Add a background for the grid area where tiles are */
-#grid {
-    display: grid;
-    grid-gap: 4px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 15px;
-}
 
 .tile:active {
     transform: scale(0.95) translateZ(-5px);
