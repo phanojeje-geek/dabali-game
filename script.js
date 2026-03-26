@@ -2349,6 +2349,7 @@ async function showHint() {
             // Check Right
             if (c < GRID_SIZE - 1) {
                 if (await checkSwapForMatch(r, c, r, c + 1)) {
+                    clearHints();
                     applyHint(r, c, r, c + 1);
                     return;
                 }
@@ -2356,6 +2357,7 @@ async function showHint() {
             // Check Down
             if (r < GRID_SIZE - 1) {
                 if (await checkSwapForMatch(r, c, r + 1, c)) {
+                    clearHints();
                     applyHint(r, c, r + 1, c);
                     return;
                 }
@@ -2408,11 +2410,61 @@ function checkMatchAt(r, c) {
     return false;
 }
 
+function getRunPositionsAt(r, c) {
+    const tile = grid[r][c];
+    if (!tile || isObstacleId(tile.type.id)) return [];
+    const typeId = tile.type.id;
+    let positions = [];
+    // Horizontal
+    let h = [{ r, c }];
+    let i = c - 1;
+    while (i >= 0 && grid[r][i] && !isObstacleId(grid[r][i].type.id) && grid[r][i].type.id === typeId) { h.push({ r, c: i }); i--; }
+    i = c + 1;
+    while (i < GRID_SIZE && grid[r][i] && !isObstacleId(grid[r][i].type.id) && grid[r][i].type.id === typeId) { h.push({ r, c: i }); i++; }
+    if (h.length >= 3) positions = positions.concat(h);
+    // Vertical
+    let v = [{ r, c }];
+    i = r - 1;
+    while (i >= 0 && grid[i][c] && !isObstacleId(grid[i][c].type.id) && grid[i][c].type.id === typeId) { v.push({ r: i, c }); i--; }
+    i = r + 1;
+    while (i < GRID_SIZE && grid[i][c] && !isObstacleId(grid[i][c].type.id) && grid[i][c].type.id === typeId) { v.push({ r: i, c }); i++; }
+    if (v.length >= 3) positions = positions.concat(v);
+    // Dedup
+    const seen = new Set();
+    return positions.filter(p => {
+        const key = `${p.r},${p.c}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 function applyHint(r1, c1, r2, c2) {
     const el1 = grid[r1][c1].el;
     const el2 = grid[r2][c2].el;
     el1.classList.add('hint-anim');
     el2.classList.add('hint-anim');
+
+    // Emphasize actual match group after swap (visual clarity)
+    const t1 = grid[r1][c1];
+    const t2 = grid[r2][c2];
+    if (t1 && t2) {
+        const temp = t1.type;
+        t1.type = t2.type;
+        t2.type = temp;
+        const group = [...getRunPositionsAt(r1, c1), ...getRunPositionsAt(r2, c2)];
+        // revert
+        t1.type = t2.type;
+        t2.type = temp;
+        const seen = new Set();
+        group.forEach(p => {
+            const key = `${p.r},${p.c}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            const tile = grid[p.r][p.c];
+            if (tile && tile.el) tile.el.classList.add('hint-anim');
+        });
+    }
     
     // Hand logic
     const hand = document.createElement('div');
