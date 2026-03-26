@@ -3159,7 +3159,13 @@ function findMatches() {
             if (run.length === 3 && freeSuperCombos > 0 && !superComboTriggered) {
                 // ... (Super combo logic)
             }
-            // ... (Other combos)
+            // Special combos
+            if (run.length === 4) {
+                applyLineClear(run, orientation, false);
+            }
+            if (run.length >= 5) {
+                applyLineClear(run, orientation, true); // cross clear
+            }
         }
     };
     
