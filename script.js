@@ -2390,18 +2390,19 @@ async function checkSwapForMatch(r1, c1, r2, c2) {
 function checkMatchAt(r, c) {
     const tile = grid[r][c];
     if (!tile) return false;
+    if (isObstacleId(tile.type.id)) return false;
     const typeId = tile.type.id;
     
     // Horiz
     let hCount = 1;
-    let i = c - 1; while(i>=0 && grid[r][i] && grid[r][i].type.id === typeId) { hCount++; i--; }
-    i = c + 1; while(i<GRID_SIZE && grid[r][i] && grid[r][i].type.id === typeId) { hCount++; i++; }
+    let i = c - 1; while(i>=0 && grid[r][i] && !isObstacleId(grid[r][i].type.id) && grid[r][i].type.id === typeId) { hCount++; i--; }
+    i = c + 1; while(i<GRID_SIZE && grid[r][i] && !isObstacleId(grid[r][i].type.id) && grid[r][i].type.id === typeId) { hCount++; i++; }
     if (hCount >= 3) return true;
     
     // Vert
     let vCount = 1;
-    i = r - 1; while(i>=0 && grid[i][c] && grid[i][c].type.id === typeId) { vCount++; i--; }
-    i = r + 1; while(i<GRID_SIZE && grid[i][c] && grid[i][c].type.id === typeId) { vCount++; i++; }
+    i = r - 1; while(i>=0 && grid[i][c] && !isObstacleId(grid[i][c].type.id) && grid[i][c].type.id === typeId) { vCount++; i--; }
+    i = r + 1; while(i<GRID_SIZE && grid[i][c] && !isObstacleId(grid[i][c].type.id) && grid[i][c].type.id === typeId) { vCount++; i++; }
     if (vCount >= 3) return true;
     
     return false;
