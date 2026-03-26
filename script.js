@@ -2277,6 +2277,7 @@ function startLevel(lvl, resume = false) {
         for (let k in currentGoals) goalProgress[k] = 0;
 
         console.log("[DEBUG] Updating UI...");
+        checkDailyReward();
         renderGoals(); // Initial Render
         updateUI();
         if (modalOverlay) modalOverlay.classList.add('hidden');
@@ -3649,6 +3650,7 @@ function updateUI() {
     const scoreValEl = document.getElementById('score-display');
     const movesValEl = document.getElementById('moves-display');
     const scoreProgressEl = document.getElementById('score-progress');
+    const comboMeterEl = document.getElementById('combo-meter');
     
     if (scoreValEl) scoreValEl.innerText = score;
     if (movesValEl) movesValEl.innerText = moves;
@@ -3656,6 +3658,11 @@ function updateUI() {
     document.getElementById('level-display').innerText = level;
     if (levelGroupEl) {
         levelGroupEl.innerText = getLevelGroupName(level);
+    }
+    document.body.classList.toggle('low-moves', moves <= 3);
+    if (comboMeterEl) {
+        comboMeterEl.innerText = `COMBO x${comboCount || 0}`;
+        comboMeterEl.classList.toggle('active', (comboCount || 0) > 1);
     }
 
     // Progress Bar and Stars
@@ -3703,6 +3710,23 @@ function computeStars(currentScore, levelConfig) {
     if (currentScore >= twoStars) return 2;
     if (currentScore >= oneStar) return 1;
     return 0;
+}
+
+function checkDailyReward() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    const d = today.getDate();
+    const todayStr = `${y}-${m}-${d}`;
+    const last = localStorage.getItem('dabali_daily_reward_date');
+    if (last !== todayStr) {
+        localStorage.setItem('dabali_daily_reward_date', todayStr);
+        freeSuperCombos += 1;
+        localStorage.setItem(STORAGE_KEYS.freeSuperCombos, String(freeSuperCombos));
+        updateFreeSuperDisplay();
+        showToast('+1 combo quotidien');
+        vibrate([80, 40, 80]);
+    }
 }
 
 function saveBestScoreAndStars(levelId, currentScore, stars) {
