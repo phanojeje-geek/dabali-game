@@ -1,0 +1,14 @@
+node_modules/
+www/
+android/app/build/
+android/build/
+android/.gradle/
+*.apk
+local.properties
+android/local.properties
+.vscode/
+security-reports/
+.DS_Store
+*/.DS_Store
+*.log
+

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "es6",
+    "target": "es2020",
+    "checkJs": false
+  },
+  "exclude": [
+    "node_modules",
+    "android",
+    "www",
+    "illustrations",
+    "security-reports"
+  ]
+}

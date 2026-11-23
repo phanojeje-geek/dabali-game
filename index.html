@@ -4,77 +4,86 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DABALI 🇨🇮</title>
-    <link rel="stylesheet" href="style.css?v=36">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#8B4513">
-    <link rel="icon" type="image/png" href="assets/icone_dabali.png">
+    <meta name="theme-color" content="#0E1626">
+    <link rel="icon" type="image/png" href="assets/splash_chef.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DABALI">
     <link rel="apple-touch-icon" href="assets/icone_dabali.png">
-    <link rel="apple-touch-startup-image" href="assets/splash.jpg">
+    <link rel="apple-touch-startup-image" href="assets/splash_chef.webp">
 </head>
 <body>
-    <!-- Splash Screen (Critical: Must be first) -->
-    <div id="splash-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #FFF8DC; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-        <img id="splash-logo" src="assets/icone_dabali.png" alt="Dabali Logo" style="display:block; width: 180px; margin: 0 auto 20px;">
-        <div class="loading-bar" style="width: 200px; height: 10px; background: #ddd; border-radius: 5px; overflow: hidden;">
-            <div id="splash-progress" style="width: 10%; height: 100%; background: #8B4513; transition: width 0.5s;"></div>
+    <!-- Splash Screen (Cinematic 9:16 Fullscreen Intro) -->
+    <div id="splash-screen" class="splash-screen">
+        <video id="splash-video-bg" class="splash-video-bg" loop muted playsinline poster="assets/splash_chef.webp">
+            <source src="assets/intro.mp4" type="video/mp4">
+        </video>
+        <div class="splash-video-overlay"></div>
+        <div class="splash-content-cinematic">
+            <button id="start-btn" type="button" class="splash-play-btn-cinematic">
+                <span class="btn-shine"></span>
+                <span>JOUER</span>
+                <i class="fas fa-play"></i>
+            </button>
         </div>
-        <button id="start-btn" style="display: none; margin-top: 30px; padding: 15px 40px; font-size: 1.5rem; background: #2E8B57; color: white; border: none; border-radius: 30px; cursor: pointer;">JOUER</button>
-        <div id="debug-log" style="margin-top: 20px; color: red; font-size: 12px; max-width: 80%; text-align: center;"></div>
     </div>
 
     <!-- Error Handler Script (Immediate) -->
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            const log = document.getElementById('debug-log');
-            if (log) log.innerHTML += `<br>Error: ${msg} at line ${line}`;
-            // Force show start button if error occurs
+            console.error("Dabali Game Uncaught Error:", msg, "at line", line, error);
             const btn = document.getElementById('start-btn');
-            if (btn) btn.style.display = 'block';
+            if (btn) btn.style.display = 'inline-flex';
         };
         
-        // Fallback timer to show button if JS hangs
         setTimeout(() => {
             const btn = document.getElementById('start-btn');
-            const bar = document.getElementById('splash-progress');
             if (btn && getComputedStyle(btn).display === 'none') {
-                if(bar) bar.style.width = '100%';
-                btn.style.display = 'block';
-                document.getElementById('debug-log').innerText = "Mode secours activé (JS lent)";
+                btn.style.display = 'inline-flex';
             }
-        }, 8000); // Increased to 8s to avoid false positives on slow devices
+        }, 3000);
     </script>
 
     <!-- Drawer Menu -->
     <div id="drawer-overlay" class="hidden"></div>
     <div id="drawer-menu">
         <div class="drawer-header">
-            <h2>MENU</h2>
-            <button id="close-drawer"><i class="fas fa-times"></i></button>
+            <h2>PARAMÈTRES</h2>
+            <button id="close-drawer" type="button" aria-label="Fermer le menu"><i class="fas fa-times"></i></button>
         </div>
         <div class="drawer-content">
             <div class="drawer-item">
-                <span>Son (Bruitages)</span>
-                <label class="switch">
-                    <input type="checkbox" id="sound-toggle" checked>
-                    <span class="slider round"></span>
-                </label>
+                <div class="drawer-slider-group">
+                    <div class="drawer-label-row">
+                        <span><i class="fas fa-volume-up"></i> Son (Bruitages)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="sound-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <input type="range" id="sound-volume" class="volume-slider" min="0" max="100" value="80">
+                </div>
             </div>
             <div class="drawer-item">
-                <span>Musique / Ambiance</span>
-                <label class="switch">
-                    <input type="checkbox" id="music-toggle" checked>
-                    <span class="slider round"></span>
-                </label>
+                <div class="drawer-slider-group">
+                    <div class="drawer-label-row">
+                        <span><i class="fas fa-music"></i> Musique / Ambiance</span>
+                        <label class="switch">
+                            <input type="checkbox" id="music-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <input type="range" id="music-volume" class="volume-slider" min="0" max="100" value="70">
+                </div>
             </div>
-            <div class="drawer-item" id="open-level-map" style="cursor:pointer;">
+            <div class="drawer-item clickable-item" id="open-level-map">
                 <span>Carte des niveaux</span>
                 <i class="fas fa-map"></i>
             </div>
-            <div class="drawer-item" id="promo-code-btn" style="cursor:pointer;">
+            <div class="drawer-item clickable-item hidden" id="promo-code-btn" style="display:none !important;">
                 <span>Code partenaire</span>
                 <i class="fas fa-gift"></i>
             </div>
@@ -92,23 +101,23 @@
                     <span class="slider round"></span>
                 </label>
             </div>
-            
-            <div class="drawer-item" id="quit-btn" style="cursor:pointer; color: red;">
+
+            <div class="drawer-item quit-item" id="quit-btn">
                 <span>Quitter le jeu</span>
                 <i class="fas fa-sign-out-alt"></i>
             </div>
 
             <div class="credits-section">
                 <h3>Crédits</h3>
-                <p class="version" style="font-size: 0.8rem; color: #888;">Version 1.11</p>
+                <p class="version">Version 1.11</p>
                 <p>Ce jeu est développé par <strong>Assamoi Kevin Stéphane</strong></p>
                 <p class="role">Référent Digital</p>
                 <p class="vibe">✨ C'est du Vibe Coding avec l'IA ✨</p>
-                
+
                 <div class="dedications">
                     <h4>Remerciements</h4>
                     <p class="thanks-note">Merci pour votre participation à la création du jeu !</p>
-                    <p><strong>Franck Armel Assamoi</strong><br><span class="role-small">Graphic Designer & DA</span></p>
+                    <p><strong>Franck Armel Assamoi</strong><br><span class="role-small">Graphic Designer &amp; DA</span></p>
                     <p><strong>Ornela Gbale</strong><br><span class="role-small">JRI</span></p>
                     <p><strong>Noura Gbale</strong><br><span class="role-small">Marketing Com</span></p>
                 </div>
@@ -119,17 +128,17 @@
     <div id="game-container">
         <!-- New Ambient Layer -->
         <div id="ambient-layer"></div>
-        
+
         <div id="header">
             <div class="header-top">
-                <button id="menu-btn"><i class="fas fa-bars"></i></button>
+                <button id="menu-btn" type="button" aria-label="Ouvrir le menu"><i class="fas fa-bars"></i></button>
                 <div class="level-info">
                     <div class="level-badge">
                         NIVEAU <span id="level-display">1</span>
                     </div>
                     <div id="level-group-display"></div>
                 </div>
-                <button id="pause-btn" class="header-btn"><i class="fas fa-cog"></i></button>
+                <button id="pause-btn" type="button" class="header-btn" aria-label="Mettre en pause"><i class="fas fa-pause"></i></button>
             </div>
 
             <div class="header-main">
@@ -143,9 +152,9 @@
                         <div id="score-progress" class="progress-bar-fill"></div>
                     </div>
                 </div>
-                
+
                 <div id="combo-meter" class="combo-meter">COMBO x0</div>
-                
+
                 <div class="moves-container">
                     <div class="moves-label">COUPS</div>
                     <div id="moves-display" class="moves-value">20</div>
@@ -156,7 +165,7 @@
                     <div id="score-display" class="score-value">0</div>
                 </div>
             </div>
-            
+
             <div class="header-bottom">
                 <div id="timer-display" class="timer-text">⏳ 01:30</div>
             </div>
@@ -168,7 +177,7 @@
                 <h2 class="modal-title">Bienvenue !</h2>
                 <p class="modal-message">Entre ton prénom chef :</p>
                 <input type="text" id="player-name-input" placeholder="Ton prénom" maxlength="12" autocomplete="off">
-                <button id="start-game-btn" class="modal-btn">C'est parti !</button>
+                <button id="start-game-btn" type="button" class="modal-btn">C'est parti !</button>
             </div>
         </div>
 
@@ -180,7 +189,7 @@
                     Aligne 3 ingrédients ou plus pour préparer ton Dabali.<br>
                     Glisse les tuiles ou tape deux cases pour les échanger !
                 </p>
-                <button id="tutorial-ok-btn" class="modal-btn">C'est bon, chef !</button>
+                <button id="tutorial-ok-btn" type="button" class="modal-btn">C'est bon, chef !</button>
             </div>
         </div>
 
@@ -193,14 +202,14 @@
 
         <div id="combo-message" class="hidden"></div>
         <div id="combo-effect" class="hidden"></div>
-        
+
         <!-- Promo Code Modal -->
         <div id="promo-modal-overlay" class="modal-overlay hidden">
             <div class="modal-content">
                 <h2 class="modal-title">Code partenaire</h2>
                 <p class="modal-message">Entre ton code pour débloquer un bonus :</p>
                 <input type="text" id="promo-code-input" placeholder="CODE" maxlength="20" autocomplete="off">
-                <button id="promo-submit-btn" class="modal-btn">Valider</button>
+                <button id="promo-submit-btn" type="button" class="modal-btn">Valider</button>
                 <p id="promo-message"></p>
             </div>
         </div>
@@ -212,8 +221,8 @@
                 <p id="ad-partner-name" class="modal-message"></p>
                 <p id="ad-code-hint" class="modal-message"></p>
                 <p class="modal-message">La pub se termine dans <span id="ad-countdown">10</span>s</p>
-                <button id="ad-copy-btn" class="modal-btn secondary-btn">Copier le code</button>
-                <button id="ad-continue-btn" class="modal-btn" disabled>Continuer</button>
+                <button id="ad-copy-btn" type="button" class="modal-btn secondary-btn">Copier le code</button>
+                <button id="ad-continue-btn" type="button" class="modal-btn" disabled>Continuer</button>
             </div>
         </div>
 
@@ -223,7 +232,7 @@
             <div id="footer-goals">
                 <!-- Goals generated dynamically -->
             </div>
-            
+
             <div class="boosters-container">
                 <div class="booster-item" title="Bombe">
                     <div class="booster-icon">💣</div>
@@ -241,12 +250,60 @@
         </div>
     </div>
 
-    <!-- Level Select -->
-    <div id="level-select-overlay" class="modal-overlay hidden">
-        <div id="level-select-content">
-            <h2 class="modal-title">Choisis ton niveau</h2>
-            <div id="level-grid"></div>
-            <button id="level-select-close" class="modal-btn">Fermer</button>
+    <!-- Level Select : Abidjan Adventure Map -->
+    <div id="level-select-overlay" class="modal-overlay hidden map-overlay">
+        <div id="level-map-container" class="level-map-container">
+            <div class="map-header glass-bar">
+                <button id="level-select-close" type="button" class="map-back-btn" title="Retour au jeu" aria-label="Retour au jeu">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="map-title-box">
+                    <h2 class="map-title">CARTE D'ABIDJAN 🇨🇮</h2>
+                    <span class="map-subtitle">30 Quartiers Gourmands</span>
+                </div>
+                <div class="map-stars-badge" id="map-total-stars">
+                    <i class="fas fa-star gold"></i> <span id="map-stars-count">0/90</span>
+                </div>
+            </div>
+
+            <!-- Scrollable Winding Map Area -->
+            <div id="abidjan-map-scroll" class="abidjan-map-scroll">
+                <svg id="map-path-svg" class="map-path-svg"></svg>
+                <div id="level-grid" class="map-nodes-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Level Preview Card (Popup when clicking a level node) - Global Overlay -->
+    <div id="level-preview-modal" class="level-preview-modal hidden">
+        <div class="level-preview-card glass-card">
+            <button id="preview-close-btn" type="button" class="preview-close-btn" aria-label="Fermer l'aperçu du niveau"><i class="fas fa-times"></i></button>
+            <div class="preview-badge" id="preview-commune">Cocody</div>
+            <h3 class="preview-title" id="preview-title">Deux Plateaux</h3>
+            <p class="preview-landmark" id="preview-landmark">Vallon &amp; Rue des Jardins</p>
+            <div class="preview-stars" id="preview-stars">
+                <i class="fas fa-star"></i>
+                <i class="fas fa-star"></i>
+                <i class="fas fa-star"></i>
+            </div>
+            <div class="preview-goals-box">
+                <div class="preview-goals-title">Objectifs à récolter :</div>
+                <div class="preview-goals-list" id="preview-goals-list"></div>
+            </div>
+            <div class="preview-info-row">
+                <div class="preview-info-item">
+                    <span class="info-label">COUPS</span>
+                    <span class="info-val" id="preview-moves">20</span>
+                </div>
+                <div class="preview-info-item">
+                    <span class="info-label">MEILLEUR SCORE</span>
+                    <span class="info-val" id="preview-best-score">0</span>
+                </div>
+            </div>
+            <button id="preview-play-btn" type="button" class="preview-play-btn">
+                <span>PRÉPARER LE DABALI</span>
+                <i class="fas fa-utensils"></i>
+            </button>
         </div>
     </div>
 
@@ -260,23 +317,23 @@
                 <i class="fas fa-star"></i>
             </div>
             <p id="modal-message">Score: 1250</p>
-            <button id="modal-btn">Niveau Suivant</button>
+            <button id="modal-btn" type="button">Niveau Suivant</button>
         </div>
     </div>
 
     <!-- Update Toast -->
     <div id="update-toast">
         <span>Une nouvelle version est disponible ! 🚀</span>
-        <button id="update-btn">Mettre à jour</button>
+        <button id="update-btn" type="button">Mettre à jour</button>
     </div>
 
-    <script src="script.js?v=36"></script>
+    <script src="script.js?v=40"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').then(reg => {
                     console.log('SW registered:', reg);
-                    
+
                     const showUpdateToast = (worker) => {
                         const toast = document.getElementById('update-toast');
                         const btn = document.getElementById('update-btn');
@@ -308,5 +365,14 @@
             });
         }
     </script>
+
+    <!-- iOS PWA Install Guidance Banner -->
+    <div id="ios-pwa-banner" class="ios-pwa-banner hidden">
+        <div class="ios-pwa-content">
+            <i class="fas fa-mobile-alt ios-pwa-icon"></i>
+            <span>Pour jouer en plein écran sur iPhone : touche <strong>Partager</strong> <i class="fas fa-arrow-up-from-bracket"></i> puis <strong>« Sur l'écran d'accueil »</strong> 📲</span>
+            <button id="close-ios-pwa-btn" type="button" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
 </body>
 </html>

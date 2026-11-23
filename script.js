@@ -6,12 +6,14 @@ const INGREDIENTS = [
     { name: 'Piment', emoji: '🌶️', id: 'piment' },
     { name: 'Oignon', emoji: '🧅', id: 'oignon' },
     { name: 'Tomate', emoji: '🍅', id: 'tomate' },
+    { name: 'Alloco', emoji: '🍌', id: 'alloco', image: 'assets/alloco.png' },
     { name: 'Cube Maggi', emoji: '🟨', id: 'maggi', image: 'assets/maggi.png' },
-    { name: 'Huile', emoji: '🍾', id: 'huile' }
+    { name: 'Boisson Fraîche', emoji: '🍾', id: 'huile', image: 'assets/bottle.png' }
 ];
 
 const OBSTACLES = {
     CRATE: { name: 'Caisse', emoji: '📦', id: 'crate', destructible: true, immovable: true },
+    SACHET: { name: 'Sachet Garba', emoji: '🛍️', id: 'sachet', destructible: true, immovable: true },
     FROZEN: { name: 'Bloc glacé', emoji: '🧊', id: 'frozen', destructible: true, immovable: true },
     ROCK: { name: 'Roche', emoji: '🪨', id: 'rock', destructible: false, immovable: true },
     FIRE: { name: 'Flamme', emoji: '🔥', id: 'fire', destructible: true, immovable: true }
@@ -19,6 +21,7 @@ const OBSTACLES = {
 
 const STORAGE_KEYS = {
     sound: 'dabali_sound',
+    soundVolume: 'dabali_sound_volume',
     vibration: 'dabali_vibration',
     theme: 'dabali_theme',
     playerName: 'dabali_player_name',
@@ -29,16 +32,89 @@ const STORAGE_KEYS = {
     freeSuperCombos: 'dabali_free_super_combos',
     gameState: 'dabali_game_state_v1',
     music: 'dabali_music',
+    musicVolume: 'dabali_music_volume',
     bonusLevels: 'dabali_bonus_levels',
     usedPromoCodes: 'dabali_used_promo_codes'
 };
 
-// ... (Existing code)
+// GLOBAL GAME STATE (Declared at top to prevent ReferenceError / TDZ)
+let grid = [];
+let score = 0;
+let moves = 20;
+let level = 1;
+let currentGoals = {};
+let goalProgress = {};
+let isProcessing = false;
+let playerName = "Joueur";
+let isSoundOn = true;
+let soundVolume = 0.8;
+let isMusicOn = true;
+let musicVolume = 0.7;
+let isVibrationOn = true;
+let freeSuperCombos = 0;
+let comboCount = 0;
+let cachedTileSize = 40;
+let cachedGap = 4;
 
-// BOOSTERS LOGIC
+let timerInterval = null;
+let avatarEl = null;
+let avatarState = 'neutral';
+let avatarIdleTimeout = null;
+let avatarLimbsEl = null;
+let timeRemaining = 90; // 1m30s
+let isPaused = false;
+let hintTimeout = null;
+let currentHint = null;
+
+// BOOSTERS LOGIC STATE
 let activeBooster = null; // 'bomb', 'lightning', 'shuffle', or null
 let swapSourceTile = null;
-let selectedTile = null; // Defined here once
+let selectedTile = null;
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[m]));
+}
+
+function spawnChefJokerHelper() {
+    if (isProcessing || isPaused || moves <= 0) return;
+    
+    const normalTiles = [];
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const t = grid[r][c];
+            if (t && !isObstacleId(t.type.id) && !isSpecialTile(t)) {
+                normalTiles.push(t);
+            }
+        }
+    }
+    if (normalTiles.length === 0) return;
+    const targetTile = normalTiles[Math.floor(Math.random() * normalTiles.length)];
+    
+    const toast = document.createElement("div");
+    toast.className = "chef-helper-toast";
+    toast.innerHTML = `<span style="font-size:1.8rem;">👨🏾‍🍳</span> <span>Cadeau du Chef : Joker Éclair ! ⚡</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2400);
+    if (typeof soundManager !== 'undefined' && soundManager.playPromoSuccess) {
+        soundManager.playPromoSuccess();
+    }
+    
+    targetTile.type = { id: "joker", name: "Joker Éclair", emoji: "⚡", special: "joker" };
+    renderTileContent(targetTile.el, targetTile.type);
+    targetTile.el.classList.add("pop-anim");
+    
+    const rct = targetTile.el.getBoundingClientRect();
+    showFloatingScore(rct.left + rct.width / 2, rct.top - 15, "JOKER DU CHEF ! 👨🏾‍🍳⚡", "#FFD700");
+}
+
+// ... (Existing code)
 
 // Booster State Management
 const BOOSTER_CONFIG = {
@@ -249,9 +325,63 @@ function bombBlast(centerTile) {
             }
         }
     }
+    
+    // Trigger cinematic explosion animation (Shockwave + Sparks + Screen Shake)
+    createBombShockwave(centerTile);
     soundManager.playExplosion();
-    vibrate([60, 40, 60]);
+    vibrate([70, 40, 70]);
     processMatches(tiles);
+}
+
+function createBombShockwave(centerTile) {
+    if (!centerTile || !centerTile.el) return;
+    const rect = centerTile.el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    // 1. Fiery Shockwave Ring
+    const wave = document.createElement('div');
+    wave.className = 'bomb-shockwave';
+    wave.style.left = `${cx}px`;
+    wave.style.top = `${cy}px`;
+    document.body.appendChild(wave);
+    setTimeout(() => wave.remove(), 600);
+
+    // 2. Bright Central Flash
+    const flash = document.createElement('div');
+    flash.className = 'bomb-center-flash';
+    flash.style.left = `${cx}px`;
+    flash.style.top = `${cy}px`;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 350);
+
+    // 3. Floating "BOOM !" Comic Pop
+    const boomText = document.createElement('div');
+    boomText.className = 'bomb-text-pop';
+    boomText.innerText = 'BOOM ! 💥';
+    boomText.style.left = `${cx}px`;
+    boomText.style.top = `${cy - 20}px`;
+    document.body.appendChild(boomText);
+    setTimeout(() => boomText.remove(), 700);
+
+    // 4. Burst Particles (24 gold and flame sparks)
+    for (let i = 0; i < 20; i++) {
+        const p = document.createElement('div');
+        p.className = 'spark-particle';
+        const angle = (i / 20) * Math.PI * 2 + (Math.random() * 0.2);
+        const dist = 60 + Math.random() * 80;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist;
+        p.style.setProperty('--tx', `${tx}px`);
+        p.style.setProperty('--ty', `${ty}px`);
+        p.style.left = `${cx}px`;
+        p.style.top = `${cy}px`;
+        p.style.backgroundColor = ['#FF4500', '#FFD700', '#FF8C00', '#FFFFFF'][i % 4];
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 550);
+    }
+
+    triggerShake(500);
 }
 
 function lineClearRow(r) {
@@ -315,7 +445,33 @@ function showLightningBeam(orientation, index) {
     ], { duration: 450, easing: 'ease-out' }).onfinish = () => beam.remove();
 }
 
+function createCartoonShockwave(cx, cy) {
+    const shock = document.createElement("div");
+    shock.className = "cartoon-shockwave";
+    shock.style.left = `${cx}px`;
+    shock.style.top = `${cy}px`;
+    shock.style.width = "74px";
+    shock.style.height = "74px";
+    document.body.appendChild(shock);
+    setTimeout(() => shock.remove(), 430);
+
+    // Spawning 8 cartoon burst sparks
+    for (let i = 0; i < 8; i++) {
+        const spark = document.createElement("div");
+        spark.className = "cartoon-impact-spark";
+        spark.style.left = `${cx}px`;
+        spark.style.top = `${cy}px`;
+        const angle = (i / 8) * 2 * Math.PI + (Math.random() - 0.5) * 0.4;
+        const dist = 35 + Math.random() * 45;
+        spark.style.setProperty("--tx", `${Math.cos(angle) * dist}px`);
+        spark.style.setProperty("--ty", `${Math.sin(angle) * dist}px`);
+        document.body.appendChild(spark);
+        setTimeout(() => spark.remove(), 450);
+    }
+}
+
 function showLightningBolt(orientation, index) {
+    if (!gridEl) return;
     const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
     const gap = 4;
     const rect = gridEl.getBoundingClientRect();
@@ -323,15 +479,15 @@ function showLightningBolt(orientation, index) {
     svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     svg.style.position = 'fixed';
     svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '9001';
+    svg.style.zIndex = '9985';
     let w, h, top, left;
     if (orientation === 'row') {
         w = rect.width;
-        h = 32;
+        h = 56;
         top = rect.top + 8 + (index * (tileSize + gap)) + tileSize / 2 - h/2;
         left = rect.left;
     } else {
-        w = 32;
+        w = 56;
         h = rect.height;
         top = rect.top;
         left = rect.left + 8 + (index * (tileSize + gap)) + tileSize / 2 - w/2;
@@ -340,46 +496,68 @@ function showLightningBolt(orientation, index) {
     svg.setAttribute('height', String(h));
     svg.style.top = `${top}px`;
     svg.style.left = `${left}px`;
-    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', '#fff200');
-    poly.setAttribute('stroke-width', '6');
-    poly.setAttribute('stroke-linejoin', 'round');
-    poly.setAttribute('stroke-linecap', 'round');
-    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    glow.setAttribute('fill', 'none');
-    glow.setAttribute('stroke', '#9ae1ff');
-    glow.setAttribute('stroke-width', '10');
-    glow.setAttribute('stroke-linejoin', 'round');
-    glow.setAttribute('stroke-linecap', 'round');
-    let points = '';
+
+    const segments = 12;
+    let mainPathStr = '';
+    const midPoints = [];
+
     if (orientation === 'row') {
-        const segments = 8;
         const step = w / segments;
         for (let i = 0; i <= segments; i++) {
             const x = i * step;
-            const y = (i % 2 === 0) ? h*0.25 : h*0.75;
-            points += `${x},${y} `;
+            const y = (h / 2) + ((i % 2 === 0 ? 1 : -1) * (14 + (Math.random() - 0.5) * 10));
+            midPoints.push({ x, y });
+            mainPathStr += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
         }
     } else {
-        const segments = 8;
         const step = h / segments;
         for (let i = 0; i <= segments; i++) {
             const y = i * step;
-            const x = (i % 2 === 0) ? w*0.25 : w*0.75;
-            points += `${x},${y} `;
+            const x = (w / 2) + ((i % 2 === 0 ? 1 : -1) * (14 + (Math.random() - 0.5) * 10));
+            midPoints.push({ x, y });
+            mainPathStr += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
         }
     }
-    poly.setAttribute('points', points.trim());
-    glow.setAttribute('points', points.trim());
-    svg.appendChild(glow);
-    svg.appendChild(poly);
+
+    // Outer plasma glow
+    const glowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    glowPath.setAttribute('class', 'lightning-path-glow');
+    glowPath.setAttribute('d', mainPathStr);
+    svg.appendChild(glowPath);
+
+    // Inner bright core
+    const corePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    corePath.setAttribute('class', 'lightning-path-core');
+    corePath.setAttribute('d', mainPathStr);
+    svg.appendChild(corePath);
+
+    // Dynamic secondary forks
+    for (let f = 0; f < 3; f++) {
+        const pIdx = Math.floor(Math.random() * (midPoints.length - 2)) + 1;
+        const pt = midPoints[pIdx];
+        const forkPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        forkPath.setAttribute('class', 'lightning-path-core');
+        const fdx = (Math.random() - 0.5) * 28;
+        const fdy = (Math.random() - 0.5) * 28;
+        forkPath.setAttribute('d', `M ${pt.x} ${pt.y} L ${pt.x + fdx} ${pt.y + fdy}`);
+        svg.appendChild(forkPath);
+    }
+
     document.body.appendChild(svg);
+    triggerShake("heavy");
+
+    // Spawn 3D cartoon shockwaves along the line
+    for (let step = 0; step < 4; step++) {
+        const targetX = orientation === 'row' ? (left + (step + 0.5) * (w / 4)) : (left + w / 2);
+        const targetY = orientation === 'row' ? (top + h / 2) : (top + (step + 0.5) * (h / 4));
+        createCartoonShockwave(targetX, targetY);
+    }
+
     const anim = svg.animate([
-        { opacity: 0.0 },
-        { opacity: 1.0 },
-        { opacity: 0.0 }
-    ], { duration: 350, easing: 'ease-out' });
+        { opacity: 0.0, transform: 'scaleY(0.7)' },
+        { opacity: 1.0, transform: 'scaleY(1.2)' },
+        { opacity: 0.0, transform: 'scaleY(0.8)' }
+    ], { duration: 420, easing: 'ease-out' });
     anim.onfinish = () => svg.remove();
 }
 function crossBlast(centerTile) {
@@ -659,6 +837,16 @@ function loadGameState() {
                 el.dataset.r = r;
                 el.dataset.c = c;
                 
+                // Position tile in grid (Fix Capture 4: restore coordinates so tiles don't collapse at 0,0)
+                const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
+                const gap = 4;
+                el.style.position = 'absolute';
+                el.style.width = `${tileSize}px`;
+                el.style.height = `${tileSize}px`;
+                el.style.top = `${r * (tileSize + gap)}px`;
+                el.style.left = `${c * (tileSize + gap)}px`;
+                el.style.opacity = '1';
+                
                 // Re-attach events
                 el.addEventListener('mousedown', handleInputStart);
                 el.addEventListener('touchstart', handleInputStart, {passive: false});
@@ -686,27 +874,194 @@ function clearSavedGame() {
     localStorage.removeItem(STORAGE_KEYS.gameState);
 }
 
-// JUICY EFFECTS
-
-function triggerShake() {
-    document.body.classList.remove('shake-anim');
-    void document.body.offsetWidth; // Trigger reflow
-    document.body.classList.add('shake-anim');
-    if (navigator.vibrate) navigator.vibrate(200);
+// JUICY EFFECTS & SPECIAL CANDY UTILS
+function isSpecialTile(tile) {
+    if (!tile || !tile.type) return false;
+    return !!tile.type.special || tile.type.id === "color_bomb";
+}
+function isStripedTile(tile) {
+    if (!tile || !tile.type) return false;
+    return tile.type.special === "striped_h" || tile.type.special === "striped_v";
+}
+function isWrappedTile(tile) {
+    if (!tile || !tile.type) return false;
+    return tile.type.special === "wrapped";
+}
+function isColorBombTile(tile) {
+    if (!tile || !tile.type) return false;
+    return tile.type.id === "color_bomb" || tile.type.special === "color_bomb";
 }
 
-function showFloatingText(x, y, text, color = '#FFD700') {
-    const el = document.createElement('div');
-    el.className = 'floating-text';
-    el.innerText = text;
-    el.style.left = x + 'px';
-    el.style.top = y + 'px';
-    el.style.color = color;
-    document.body.appendChild(el);
-    
+function triggerShake(intensity = "medium") {
+    const shakeClass = intensity === "light" ? "shake-light" :
+                       intensity === "heavy" ? "shake-heavy" :
+                       intensity === "mega" ? "shake-mega" : "shake-medium";
+    const duration = intensity === "light" ? 200 :
+                     intensity === "heavy" ? 450 :
+                     intensity === "mega" ? 650 : 320;
+    document.body.classList.remove("shake-light", "shake-medium", "shake-heavy", "shake-mega", "shake-anim");
+    void document.body.offsetWidth;
+    document.body.classList.add(shakeClass);
     setTimeout(() => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    }, 1000);
+        document.body.classList.remove(shakeClass);
+    }, duration);
+    if (intensity === "light") vibrate(30);
+    else if (intensity === "heavy") vibrate([60, 40, 80]);
+    else if (intensity === "mega") vibrate([100, 50, 100, 50, 150]);
+    else vibrate(50);
+}
+
+function showFloatingScore(x, y, text, color = "#FFD700") {
+    const el = document.createElement("div");
+    el.className = "floating-score-pop";
+    el.innerText = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    if (color) el.style.color = color;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 850);
+}
+
+function showFloatingText(x, y, text, color = "#FFD700") {
+    showFloatingScore(x, y, text, color);
+}
+
+function showLaserBeam(orientation, index, size = 1) {
+    if (!gridEl) return;
+    const tileSize = cachedTileSize || 40;
+    const gap = cachedGap || 4;
+    const rect = gridEl.getBoundingClientRect();
+
+    const beam = document.createElement("div");
+    beam.className = "laser-beam-full";
+
+    if (orientation === "row") {
+        const top = rect.top + 8 + (index * (tileSize + gap)) + (tileSize / 2) - ((size * tileSize) / 2);
+        beam.style.top = `${top}px`;
+        beam.style.left = `${rect.left - 20}px`;
+        beam.style.width = `${rect.width + 40}px`;
+        beam.style.height = `${size * tileSize + 8}px`;
+        beam.style.background = "linear-gradient(90deg, rgba(255,255,255,0) 0%, #FFFFFF 20%, #00FFFF 50%, #FF8C00 80%, rgba(255,255,255,0) 100%)";
+    } else {
+        const left = rect.left + 8 + (index * (tileSize + gap)) + (tileSize / 2) - ((size * tileSize) / 2);
+        beam.style.left = `${left}px`;
+        beam.style.top = `${rect.top - 20}px`;
+        beam.style.width = `${size * tileSize + 8}px`;
+        beam.style.height = `${rect.height + 40}px`;
+        beam.style.background = "linear-gradient(180deg, rgba(255,255,255,0) 0%, #FFFFFF 20%, #00FFFF 50%, #FF8C00 80%, rgba(255,255,255,0) 100%)";
+    }
+
+    document.body.appendChild(beam);
+    setTimeout(() => beam.remove(), 380);
+}
+
+function showLightningArcs(sourceX, sourceY, targetPoints) {
+    if (!targetPoints || targetPoints.length === 0) return;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "lightning-bolt-svg");
+    svg.style.position = "fixed";
+    svg.style.top = "0";
+    svg.style.left = "0";
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+    svg.style.pointerEvents = "none";
+    svg.style.zIndex = "9985";
+    
+    targetPoints.forEach(pt => {
+        const dx = pt.x - sourceX;
+        const dy = pt.y - sourceY;
+        const dist = Math.hypot(dx, dy) || 1;
+        const steps = Math.max(4, Math.floor(dist / 32));
+        
+        let dMain = `M ${sourceX} ${sourceY}`;
+        const midPoints = [];
+        for (let i = 1; i < steps; i++) {
+            const ratio = i / steps;
+            const perpX = -dy / dist;
+            const perpY = dx / dist;
+            const jitter = (Math.random() - 0.5) * 36;
+            const mx = sourceX + dx * ratio + perpX * jitter;
+            const my = sourceY + dy * ratio + perpY * jitter;
+            midPoints.push({ x: mx, y: my });
+            dMain += ` L ${mx} ${my}`;
+        }
+        dMain += ` L ${pt.x} ${pt.y}`;
+
+        // Glow Path (plasma cyan)
+        const glow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        glow.setAttribute("class", "lightning-path-glow");
+        glow.setAttribute("d", dMain);
+        svg.appendChild(glow);
+
+        // Core Path (pure white)
+        const core = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        core.setAttribute("class", "lightning-path-core");
+        core.setAttribute("d", dMain);
+        svg.appendChild(core);
+
+        // Dynamic forked branch
+        if (midPoints.length >= 2) {
+            const forkIdx = Math.floor(Math.random() * midPoints.length);
+            const fpt = midPoints[forkIdx];
+            const branchLen = 22 + Math.random() * 22;
+            const branchAngle = Math.atan2(dy, dx) + (Math.random() > 0.5 ? 0.75 : -0.75);
+            const bx = fpt.x + Math.cos(branchAngle) * branchLen;
+            const by = fpt.y + Math.sin(branchAngle) * branchLen;
+            const branch = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            branch.setAttribute("class", "lightning-path-core");
+            branch.setAttribute("d", `M ${fpt.x} ${fpt.y} L ${bx} ${by}`);
+            svg.appendChild(branch);
+        }
+
+        // Spawn 3D Cartoon Shockwave & Sparks at target
+        createCartoonShockwave(pt.x, pt.y);
+    });
+    
+    document.body.appendChild(svg);
+    triggerShake("heavy");
+    if (typeof soundManager !== 'undefined' && soundManager.playThunderImpact) {
+        soundManager.playThunderImpact();
+    }
+    setTimeout(() => svg.remove(), 450);
+}
+
+function createWrappedExplosion(tile) {
+    if (!tile || !tile.el) return;
+    const rect = tile.el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const wave = document.createElement("div");
+    wave.className = "bomb-shockwave";
+    wave.style.borderColor = "#FFD700";
+    wave.style.left = `${cx}px`;
+    wave.style.top = `${cy}px`;
+    document.body.appendChild(wave);
+    setTimeout(() => wave.remove(), 550);
+
+    const flash = document.createElement("div");
+    flash.className = "bomb-center-flash";
+    flash.style.background = "radial-gradient(circle, #FFFFFF 0%, #FFD700 45%, #FF8C00 70%, transparent 100%)";
+    flash.style.left = `${cx}px`;
+    flash.style.top = `${cy}px`;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 350);
+
+    showFloatingScore(cx, cy - 25, "MARMITE ROYALE ! 🍲💥", "#FFD700");
+
+    for (let i = 0; i < 16; i++) {
+        const p = document.createElement("div");
+        p.className = "spark-particle";
+        const angle = (i / 16) * Math.PI * 2 + (Math.random() * 0.2);
+        const dist = 50 + Math.random() * 60;
+        p.style.setProperty("--tx", `${Math.cos(angle) * dist}px`);
+        p.style.setProperty("--ty", `${Math.sin(angle) * dist}px`);
+        p.style.left = `${cx}px`;
+        p.style.top = `${cy}px`;
+        p.style.backgroundColor = ["#FFD700", "#FF4500", "#FFA500", "#FFFFFF"][i % 4];
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 500);
+    }
 }
 
 function showWouhEffect() {
@@ -748,7 +1103,8 @@ function getParticleColor(typeId) {
         case 'oignon': return '#DDA0DD';
         case 'tomate': return '#FF6347';
         case 'maggi': return '#FFD700';
-        case 'huile': return '#FFA500';
+        case 'alloco': return '#FFB703';
+        case 'huile': return '#52B788';
         case 'crate': return '#8B4513';
         case 'frozen': return '#E0FFFF';
         case 'rock': return '#696969';
@@ -758,7 +1114,7 @@ function getParticleColor(typeId) {
 }
 
 function spawnMatchParticles(x, y, color) {
-    const count = 12;
+    const count = 3;
     for(let i=0; i<count; i++) {
         const p = document.createElement('div');
         p.className = 'particle';
@@ -767,20 +1123,20 @@ function spawnMatchParticles(x, y, color) {
         p.style.top = y + 'px';
         
         const angle = Math.random() * Math.PI * 2;
-        const velocity = Math.random() * 60 + 20;
+        const velocity = Math.random() * 40 + 15;
         
         p.style.setProperty('--tx', Math.cos(angle) * velocity + 'px');
         p.style.setProperty('--ty', Math.sin(angle) * velocity + 'px');
         
         document.body.appendChild(p);
         
-        setTimeout(() => p.remove(), 600);
+        setTimeout(() => p.remove(), 320);
     }
 }
 
 
 const LEVELS = [
-    { id: 1, moves: 20, goals: { attieke: 10, poisson: 10 }, 
+    { id: 1, moves: 25, goals: { attieke: 8, poisson: 8 }, 
       layout: [
         [1,1,1,1,1,1,1,1],
         [1,1,1,1,1,1,1,1],
@@ -804,7 +1160,7 @@ const LEVELS = [
         [0,1,1,1,1,1,1,0]
       ]
     },
-    { id: 3, moves: 30, goals: { attieke: 15, poisson: 15, huile: 10 }, obstacles: { count: 3 },
+    { id: 3, moves: 26, goals: { attieke: 12, poisson: 12, huile: 8 }, obstacles: { count: 3 },
       layout: [
         [1,1,1,0,0,1,1,1],
         [1,1,1,0,0,1,1,1],
@@ -1008,19 +1364,48 @@ const RECIPES = [
     ['maggi', 'huile', 'piment']
 ];
 
-const PROMO_CODES = {
-    'GARBA2025': { type: 'unlock_level', level: null, message: 'Tu as débloqué un niveau bonus !' },
-    'DABALI50': { type: 'unlock_level', level: null, message: 'Tu as débloqué un niveau bonus !' },
-    'SUPERDABALI': { type: 'free_super', count: 3, message: 'Tu as gagné 3 super combos.' }
-};
+// LES 30 QUARTIERS EMBLÉMATIQUES D'ABIDJAN (CARTE D'AVENTURE DABALI)
+const QUARTIERS_ABIDJAN = [
+    { id: 1, name: "Deux Plateaux", commune: "Cocody", landmark: "Rue des Jardins & Vallon", color: "#FF7043" },
+    { id: 2, name: "Angré", commune: "Cocody", landmark: "Château d'eau & 8e Tranche", color: "#FFA726" },
+    { id: 3, name: "Riviera 3", commune: "Cocody", landmark: "Lycée Français & Cap Nord", color: "#FFCA28" },
+    { id: 4, name: "Palmeraie", commune: "Cocody", landmark: "Rond-point Palmeraie", color: "#66BB6A" },
+    { id: 5, name: "Anono", commune: "Cocody", landmark: "Village Ebrié & Bord de lagune", color: "#26A69A" },
+    { id: 6, name: "Maroc", commune: "Yopougon", landmark: "Carrefour Américain & Maquis", color: "#42A5F5" },
+    { id: 7, name: "Niangon", commune: "Yopougon", landmark: "Niangon Sud & Église", color: "#5C6BC0" },
+    { id: 8, name: "Toits Rouges", commune: "Yopougon", landmark: "Quartier chaleureux", color: "#EC407A" },
+    { id: 9, name: "Siporex", commune: "Yopougon", landmark: "Grand Carrefour Yopougon", color: "#AB47BC" },
+    { id: 10, name: "Selmer", commune: "Yopougon", landmark: "Cœur historique de Yop", color: "#EF5350" },
+    { id: 11, name: "Zone 4", commune: "Marcory", landmark: "Rue du 7 Décembre & Gastronomie", color: "#FFA726" },
+    { id: 12, name: "Biétry", commune: "Marcory", landmark: "Lagune & Restaurants", color: "#29B6F6" },
+    { id: 13, name: "Anoumabo", commune: "Marcory", landmark: "Berceau du Magic System & FEMUA", color: "#26A69A" },
+    { id: 14, name: "Arras", commune: "Treichville", landmark: "Avenue Reine Pokou", color: "#FF7043" },
+    { id: 15, name: "Belleville", commune: "Treichville", landmark: "Rue 12 & Maquis mythiques", color: "#FFCA28" },
+    { id: 16, name: "Vridi", commune: "Port-Bouët", landmark: "Canal & Plages de Vridi", color: "#26C6DA" },
+    { id: 17, name: "Gonzagueville", commune: "Port-Bouët", landmark: "Route de Grand-Bassam", color: "#78909C" },
+    { id: 18, name: "Adjouffou", commune: "Port-Bouët", landmark: "Zone aéroportuaire & Cités", color: "#8D6E63" },
+    { id: 19, name: "Sogefiha", commune: "Koumassi", landmark: "Cités conviviales & Garbadrome", color: "#FFA726" },
+    { id: 20, name: "Avocatier", commune: "Abobo", landmark: "Grand Marché Avocatier", color: "#66BB6A" },
+    { id: 21, name: "Gendarmerie", commune: "Abobo", landmark: "Camp d'Abobo & Allées", color: "#42A5F5" },
+    { id: 22, name: "PK 18", commune: "Abobo", landmark: "Route d'Anyama & Carrefours", color: "#7E57C2" },
+    { id: 23, name: "Mirador", commune: "Adjamé", landmark: "Hauts d'Adjamé & Échanges", color: "#EC407A" },
+    { id: 24, name: "220 Logements", commune: "Adjamé", landmark: "Cité célèbre d'Adjamé", color: "#FF7043" },
+    { id: 25, name: "Williamsville", commune: "Adjamé", landmark: "Macaci & Grande Mosquée", color: "#FFA726" },
+    { id: 26, name: "Plateau Centre", commune: "Plateau", landmark: "Tours & Pont Alassane Ouattara", color: "#29B6F6" },
+    { id: 27, name: "Agban", commune: "Attécoubé", landmark: "Camp militaire Agban", color: "#5C6BC0" },
+    { id: 28, name: "Boribana", commune: "Attécoubé", landmark: "Bord de Lagune Ébrié", color: "#26A69A" },
+    { id: 29, name: "Feh Kessé", commune: "Bingerville", landmark: "Collines verdoyantes", color: "#9CCC65" },
+    { id: 30, name: "Ananeraie", commune: "Yopougon", landmark: "Terminus 40 & Cités calmes", color: "#FFD54F" }
+];
+
+function getLevelQuartier(levelId) {
+    const idx = (levelId - 1) % QUARTIERS_ABIDJAN.length;
+    return QUARTIERS_ABIDJAN[idx];
+}
 
 function getLevelGroupName(levelId) {
-    if (levelId <= 10) return "Garba du quartier";
-    if (levelId <= 20) return "Dabali de Yopougon";
-    if (levelId <= 40) return "Dabali de Cocody";
-    if (levelId <= 60) return "Dabali de Treichville";
-    if (levelId <= 80) return "Dabali du marché";
-    return "Dabali de Côte d'Ivoire";
+    const q = getLevelQuartier(levelId);
+    return `${q.name} (${q.commune})`;
 }
 
 function renderAmbient(themeClass) {
@@ -1078,35 +1463,9 @@ function applyThemeForLevel(levelId) {
     renderAmbient(themeClass);
 }
 
-// STATE
-let grid = [];
-let score = 0;
-let moves = 20;
-let level = 1;
-let currentGoals = {};
-let goalProgress = {};
-// let selectedTile = null; // Defined globally at top
-let isProcessing = false;
-let playerName = "Joueur";
-let isSoundOn = true;
-let isVibrationOn = true;
-let freeSuperCombos = 0;
-let comboCount = 0;
-
-let timerInterval = null;
-let avatarEl = null;
-let avatarState = 'neutral';
-let avatarIdleTimeout = null;
-let avatarLimbsEl = null;
-let timeRemaining = 90; // 1m30s
-let isPaused = false;
-let hintTimeout = null;
-let currentHint = null;
-
 // AMBIENT SOUND SYSTEM
 let ambientOscillators = [];
 let ambientGain = null;
-let isMusicOn = true;
 
 const ambientSoundManager = {
     stop: () => {
@@ -1124,7 +1483,7 @@ const ambientSoundManager = {
         if (!isMusicOn) return;
         ambientSoundManager.stop();
         
-        if (soundCtx.state === 'suspended') soundCtx.resume();
+        if (!ensureAudioContextReady()) return;
         
         ambientGain = soundCtx.createGain();
         ambientGain.gain.value = 0.05; // Very low volume background
@@ -1360,137 +1719,247 @@ const ambientManager = {
 };
 
 // SOUND SYSTEM
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-const soundCtx = new AudioContext();
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const soundCtx = AudioContextClass ? new AudioContextClass() : null;
 
-// Simple Synthesizer for African Ambient Music
+function ensureAudioContextReady() {
+    if (!soundCtx) return false;
+    if (soundCtx.state === "suspended") {
+        if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+            return false;
+        }
+        try {
+            soundCtx.resume().catch(() => {});
+        } catch(e) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// African Background Music System (7-track playlist avec fondu et enchaînement continu)
+const MUSIC_TRACKS = [
+    'assets/audio/music/track1_dabali_game.mp3',
+    'assets/audio/music/track2_amapiano.mp3',
+    'assets/audio/music/track3_on_bouge.mp3',
+    'assets/audio/music/track4_fais_ton_malin.mp3',
+    'assets/audio/music/track5_rap_gang.mp3',
+    'assets/audio/music/track6_african_drums.mp3',
+    'assets/audio/music/track7_mes_abonnes.mp3'
+];
+
 const ambientSynth = {
-    ctx: soundCtx,
-    nodes: [],
+    tracks: [...MUSIC_TRACKS],
+    currentIndex: 0,
+    audio: null,
     isPlaying: false,
-    tempo: 120,
-    
-    playNote: function(freq, time, duration, vol=0.08) {
-        if(!isMusicOn) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.frequency.value = freq;
-        osc.type = 'sine'; // Changed from triangle to sine for pure tone
-        gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(vol, time + 0.01); // Faster attack (percussive)
-        gain.gain.exponentialRampToValueAtTime(0.001, time + duration); // Fast decay
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(time);
-        osc.stop(time + duration + 0.1);
-        this.nodes.push(osc);
-    },
-    
-    playPercussion: function(time) {
-        if(!isMusicOn) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.frequency.setValueAtTime(150, time);
-        osc.frequency.exponentialRampToValueAtTime(80, time + 0.05); // Faster drop
-        gain.gain.setValueAtTime(0.2, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); // Very short (woodblock style)
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(time);
-        osc.stop(time + 0.1);
-        this.nodes.push(osc);
-    },
-    
-    startLoop: function() {
-        if(this.isPlaying) return;
-        this.isPlaying = true;
-        this.schedule(this.ctx.currentTime + 0.1);
-    },
-    
-    schedule: function(startTime) {
-        if(!this.isPlaying) return;
-        
-        const beatLen = 60 / this.tempo;
-        // Simple 4/4 Afrobeat pattern
-        // Percussion on 1, 2&, 4
-        this.playPercussion(startTime);
-        this.playPercussion(startTime + beatLen * 1.5);
-        this.playPercussion(startTime + beatLen * 3);
-        
-        // Melody (Pentatonic: C D E G A)
-        // Adjusted to be less "wave-like" and more "marimba"
-        const scale = [261.63, 293.66, 329.63, 392.00, 440.00];
-        const note = scale[Math.floor(Math.random() * scale.length)];
-        
-        if(Math.random() > 0.3) {
-            this.playNote(note, startTime, beatLen * 0.5, 0.08); // Reduced volume
+    baseVolume: 0.28,
+
+    init: function() {
+        for (let i = this.tracks.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.tracks[i], this.tracks[j]] = [this.tracks[j], this.tracks[i]];
         }
-        if(Math.random() > 0.5) {
-            this.playNote(scale[Math.floor(Math.random()*scale.length)], startTime + beatLen * 2, beatLen * 0.5, 0.08);
+    },
+
+    startLoop: function() {
+        if (!isMusicOn) return;
+        if (this.isPlaying && this.audio && !this.audio.paused) return;
+        this.playTrack(this.currentIndex);
+    },
+
+    playTrack: function(index) {
+        if (!isMusicOn) return;
+        this.currentIndex = index % this.tracks.length;
+        const src = this.tracks[this.currentIndex];
+
+        if (this.audio) {
+            try {
+                this.audio.pause();
+                this.audio.currentTime = 0;
+            } catch(e) {}
         }
 
-        setTimeout(() => this.schedule(startTime + beatLen * 4), (beatLen * 4 * 1000) - 50);
+        try {
+            this.audio = new Audio(src);
+            const currentVol = (typeof musicVolume === 'number') ? musicVolume : 1.0;
+            this.audio.volume = Math.max(0, Math.min(1, this.baseVolume * currentVol));
+            this.audio.preload = 'auto';
+
+            this.audio.onended = () => {
+                this.playTrack(this.currentIndex + 1);
+            };
+
+            this.audio.onerror = (err) => {
+                console.warn("Musique fond erreur, morceau suivant...", err);
+                setTimeout(() => this.playTrack(this.currentIndex + 1), 1200);
+            };
+
+            this.audio.play().then(() => {
+                this.isPlaying = true;
+            }).catch(e => {
+                console.log("Attente clic pour démarrage audio:", e);
+                this.isPlaying = false;
+            });
+        } catch(err) {
+            console.error("Erreur lecteur musique fond:", err);
+        }
     },
-    
+
+    updateVolume: function() {
+        if (this.audio) {
+            const currentVol = (typeof musicVolume === 'number') ? musicVolume : 1.0;
+            this.audio.volume = Math.max(0, Math.min(1, this.baseVolume * currentVol));
+        }
+    },
+
     stop: function() {
         this.isPlaying = false;
-        this.nodes.forEach(n => { try{n.stop()}catch(e){} });
-        this.nodes = [];
+        if (this.audio) {
+            try {
+                this.audio.pause();
+            } catch(e) {}
+        }
     }
 };
+ambientSynth.init();
+
+const PENTATONIC_SCALE = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98];
 
 const soundManager = {
     playTone: (freq, type, duration) => {
-        if (!isSoundOn) return;
-        if (soundCtx.state === 'suspended') soundCtx.resume();
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
         const osc = soundCtx.createOscillator();
         const gain = soundCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, soundCtx.currentTime);
-        gain.gain.setValueAtTime(0.1, soundCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, soundCtx.currentTime + duration);
+        const effectiveGain = 0.12 * soundVolume;
+        gain.gain.setValueAtTime(effectiveGain, soundCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, soundCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(soundCtx.destination);
         osc.start();
         osc.stop(soundCtx.currentTime + duration);
     },
-    playClick: () => soundManager.playTone(400, 'sine', 0.1),
+    playClick: () => soundManager.playTone(400, "sine", 0.1),
     playMatch: (comboMultiplier = 1) => {
-        const baseFreq = 600;
-        const pitch = Math.min(1200, baseFreq + ((comboMultiplier - 1) * 50));
-        soundManager.playTone(pitch, 'sine', 0.1);
-        setTimeout(() => soundManager.playTone(pitch * 1.33, 'sine', 0.2), 100);
+        if (!isSoundOn || soundVolume <= 0) return;
+        const noteIdx = Math.min(Math.max(0, (comboMultiplier || 1) - 1), PENTATONIC_SCALE.length - 1);
+        const freq = PENTATONIC_SCALE[noteIdx];
+        soundManager.playTone(freq, "sine", 0.12);
+        setTimeout(() => soundManager.playTone(freq * 1.5, "triangle", 0.18), 65);
+    },
+    playLaserShoot: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.type = "sawtooth";
+        const now = soundCtx.currentTime;
+        osc.frequency.setValueAtTime(1400, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.25);
+        gain.gain.setValueAtTime(0.18 * soundVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+    },
+    playWrappedBomb: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.type = "sine";
+        const now = soundCtx.currentTime;
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.35);
+        gain.gain.setValueAtTime(0.24 * soundVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+        soundManager.playExplosion();
+    },
+    playLightningZap: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.type = "sawtooth";
+        const now = soundCtx.currentTime;
+        osc.frequency.setValueAtTime(1800, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.16);
+        gain.gain.setValueAtTime(0.16 * soundVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+    },
+    playThunderImpact: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.type = "sawtooth";
+        const now = soundCtx.currentTime;
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.4);
+        gain.gain.setValueAtTime(0.22 * soundVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+        soundManager.playExplosion();
+    },
+    playFishSizzle: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        const notes = [659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((f, i) => {
+            setTimeout(() => soundManager.playTone(f, "sine", 0.08), i * 50);
+        });
+    },
+    playColorBombMega: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        const chord = [523.25, 659.25, 783.99, 1046.50];
+        chord.forEach((f, i) => {
+            setTimeout(() => soundManager.playTone(f, "triangle", 0.35), i * 75);
+        });
     },
     playBonDabali: () => {
-        soundManager.playTone(400, 'square', 0.1);
-        setTimeout(() => soundManager.playTone(600, 'square', 0.1), 100);
-        setTimeout(() => soundManager.playTone(800, 'square', 0.1), 200);
-        setTimeout(() => soundManager.playTone(1000, 'square', 0.4), 300);
+        soundManager.playTone(400, "square", 0.1);
+        setTimeout(() => soundManager.playTone(600, "square", 0.1), 100);
+        setTimeout(() => soundManager.playTone(800, "square", 0.1), 200);
+        setTimeout(() => soundManager.playTone(1000, "square", 0.4), 300);
     },
     playWin: () => {
-        [300, 400, 500, 600, 800].forEach((f, i) => setTimeout(() => soundManager.playTone(f, 'triangle', 0.2), i * 100));
+        [300, 400, 500, 600, 800].forEach((f, i) => setTimeout(() => soundManager.playTone(f, "triangle", 0.2), i * 100));
     },
     playError: () => {
-        soundManager.playTone(220, 'sawtooth', 0.12);
-        setTimeout(() => soundManager.playTone(160, 'sawtooth', 0.18), 100);
+        soundManager.playTone(220, "sawtooth", 0.12);
+        setTimeout(() => soundManager.playTone(160, "sawtooth", 0.18), 100);
     },
     playAdStart: () => {
-        soundManager.playTone(700, 'sine', 0.08);
-        setTimeout(() => soundManager.playTone(900, 'sine', 0.1), 80);
+        soundManager.playTone(700, "sine", 0.08);
+        setTimeout(() => soundManager.playTone(900, "sine", 0.1), 80);
     },
     playAdEnd: () => {
-        soundManager.playTone(480, 'triangle', 0.1);
-        setTimeout(() => soundManager.playTone(720, 'triangle', 0.14), 100);
+        soundManager.playTone(480, "triangle", 0.1);
+        setTimeout(() => soundManager.playTone(720, "triangle", 0.14), 100);
     },
     playPromoSuccess: () => {
-        soundManager.playTone(550, 'square', 0.1);
-        setTimeout(() => soundManager.playTone(750, 'square', 0.14), 90);
-        setTimeout(() => soundManager.playTone(950, 'square', 0.16), 180);
+        soundManager.playTone(550, "square", 0.1);
+        setTimeout(() => soundManager.playTone(750, "square", 0.14), 90);
+        setTimeout(() => soundManager.playTone(950, "square", 0.16), 180);
     },
     playExplosion: () => {
-        if (!isSoundOn) return;
-        if (soundCtx.state === 'suspended') soundCtx.resume();
-        const bufferSize = soundCtx.sampleRate * 0.4;
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const bufferSize = Math.floor(soundCtx.sampleRate * 0.4);
         const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -1499,22 +1968,24 @@ const soundManager = {
         const source = soundCtx.createBufferSource();
         source.buffer = buffer;
         const gain = soundCtx.createGain();
-        gain.gain.setValueAtTime(0.15, soundCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, soundCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.18 * soundVolume, soundCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, soundCtx.currentTime + 0.4);
         source.connect(gain);
         gain.connect(soundCtx.destination);
         source.start();
-        // Add a low thump
-        soundManager.playTone(80, 'sine', 0.3);
+        soundManager.playTone(80, "sine", 0.3);
     },
     playImpact: () => {
-        soundManager.playTone(150, 'square', 0.1);
+        soundManager.playTone(150, "square", 0.1);
     }
 };
 
 function vibrate(pattern) {
-    if (!isVibrationOn) return;
-    if (navigator.vibrate) navigator.vibrate(pattern);
+    if (!isVibrationOn || !navigator || !navigator.vibrate) return;
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    try {
+        navigator.vibrate(pattern);
+    } catch(e) {}
 }
 
 function updateFreeSuperDisplay() {
@@ -1673,12 +2144,14 @@ function spawnComboStars() {
 }
 
 function shouldShowAdAfterLevel(completedLevel, previousMax, newMax) {
-    if (newMax <= previousMax) return false;
-    if (completedLevel <= 0) return false;
-    return completedLevel % 3 === 0;
+    // Désactivé temporairement tant qu'aucun partenariat commercial officiel n'est actif
+    return false;
 }
 
 function showAdForLevel(completedLevel) {
+    // Mode sans sponsor : passage direct au niveau suivant
+    nextLevel();
+    return;
     if (!adModalOverlay || !adPartnerNameEl || !adCodeHintEl || !adCountdownEl || !adContinueBtn) {
         nextLevel();
         return;
@@ -1771,6 +2244,8 @@ function updateTileSize() {
         const clamped = Math.max(30, Math.min(60, raw)); // Reduced max size to 60px to prevent overflow
         
         if (!isNaN(clamped)) {
+            cachedTileSize = clamped;
+            cachedGap = gridGap;
             document.documentElement.style.setProperty('--tile-size', `${clamped}px`);
             
             // Set Grid Height explicitely for Absolute Positioning
@@ -1904,68 +2379,7 @@ function initGame() {
                     }, 300);
                 }
                 soundManager.playWin(); // Welcome sound
-                
-                // Check for saved game state first
-        if (isMusicOn) {
-            // Start ambient music
-            setTimeout(() => ambientSynth.startLoop(), 1000);
-        }
-
-        const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
-                let resumed = false;
-                if (savedStateRaw) {
-                    try {
-                        const state = JSON.parse(savedStateRaw);
-                        if (state.level && state.moves > 0 && state.timeRemaining > 0) {
-                             // Show Resume Modal
-                             const resumeOverlay = document.createElement('div');
-                             resumeOverlay.className = 'modal-overlay active';
-                             resumeOverlay.style.zIndex = '3000';
-                             resumeOverlay.innerHTML = `
-                                <div class="modal-content" style="background: rgba(20,20,20,0.95); border: 2px solid #FFD700;">
-                                    <h2 style="color:#FFD700; font-size:1.8rem;">Partie en cours</h2>
-                                    <p style="margin:20px 0; font-size:1.1rem;">Une partie sauvegardée a été trouvée (Niveau ${state.level}).</p>
-                                    <p style="margin-bottom:20px;">Score: ${state.score}</p>
-                                    <div class="modal-buttons" style="display:flex; gap:15px; justify-content:center;">
-                                        <button id="resume-yes-btn" class="modal-btn" style="background:#4CAF50; border:none;">Reprendre</button>
-                                        <button id="resume-no-btn" class="modal-btn" style="background:#f44336; border:none;">Nouvelle Partie</button>
-                                    </div>
-                                </div>
-                             `;
-                             document.body.appendChild(resumeOverlay);
-                             
-                             document.getElementById('resume-yes-btn').onclick = () => {
-                                 resumeOverlay.remove();
-                                 level = state.level;
-                                 startLevel(level, true);
-                             };
-                             
-                             document.getElementById('resume-no-btn').onclick = () => {
-                                 resumeOverlay.remove();
-                                 clearSavedGame();
-                                 openLevelSelect();
-                             };
-                             resumed = true; // Handled by modal logic
-                        }
-                    } catch(e) {
-                        console.error("Error checking saved state", e);
-                    }
-                }
-
-                if (!resumed) {
-                    const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
-                    const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
-                    level = initialLevel;
-                    const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
-                    const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
-                    
-                    if (maxUnlocked <= 1 && level === 1 && tutorialOverlay) {
-                        tutorialOverlay.classList.remove('hidden');
-                        tutorialOverlay.classList.add('active');
-                    } else {
-                        openLevelSelect();
-                    }
-                }
+                proceedAfterSplash();
             });
         }
 
@@ -1991,6 +2405,36 @@ function initGame() {
             });
         }
 
+        const soundVolEl = document.getElementById('sound-volume');
+        const musicVolEl = document.getElementById('music-volume');
+
+        const savedSoundVol = parseFloat(localStorage.getItem(STORAGE_KEYS.soundVolume));
+        if (Number.isFinite(savedSoundVol)) {
+            soundVolume = Math.max(0, Math.min(1, savedSoundVol));
+            if (soundVolEl) soundVolEl.value = Math.round(soundVolume * 100);
+        }
+
+        const savedMusicVol = parseFloat(localStorage.getItem(STORAGE_KEYS.musicVolume));
+        if (Number.isFinite(savedMusicVol)) {
+            musicVolume = Math.max(0, Math.min(1, savedMusicVol));
+            if (musicVolEl) musicVolEl.value = Math.round(musicVolume * 100);
+        }
+
+        if (soundVolEl) {
+            soundVolEl.addEventListener('input', (e) => {
+                soundVolume = parseInt(e.target.value, 10) / 100;
+                localStorage.setItem(STORAGE_KEYS.soundVolume, String(soundVolume));
+            });
+        }
+
+        if (musicVolEl) {
+            musicVolEl.addEventListener('input', (e) => {
+                musicVolume = parseInt(e.target.value, 10) / 100;
+                localStorage.setItem(STORAGE_KEYS.musicVolume, String(musicVolume));
+                ambientSynth.updateVolume();
+            });
+        }
+
         if (soundToggle) {
             soundToggle.addEventListener('change', () => {
                 isSoundOn = soundToggle.checked;
@@ -2011,10 +2455,8 @@ function initGame() {
                 isMusicOn = musicToggle.checked;
                 localStorage.setItem(STORAGE_KEYS.music, isMusicOn ? 'on' : 'off');
                 if (isMusicOn) {
-                    // ambientSoundManager.play(ambientManager.currentTheme);
                     ambientSynth.startLoop();
                 } else {
-                    // ambientSoundManager.stop();
                     ambientSynth.stop();
                 }
             });
@@ -2121,48 +2563,202 @@ function initGame() {
 }
 
 function openLevelSelect() {
-    if (!levelGridEl || !levelSelectOverlay) return;
-    levelGridEl.innerHTML = '';
+    clearHint();
+    if (isMusicOn) ambientSynth.startLoop();
+    if (!levelSelectOverlay) return;
+    levelSelectOverlay.classList.remove('hidden');
+    levelSelectOverlay.classList.add('active');
+    renderAbidjanMap();
+}
+
+function renderAbidjanMap() {
+    const gridContainer = document.getElementById('level-grid');
+    const svgPath = document.getElementById('map-path-svg');
+    const starsCountEl = document.getElementById('map-stars-count');
+    if (!gridContainer) return;
+    
+    gridContainer.innerHTML = '';
+    if (svgPath) svgPath.innerHTML = '';
+    
     const maxUnlockedRaw = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
     const maxUnlocked = Number.isFinite(maxUnlockedRaw) ? maxUnlockedRaw : 1;
-    
-    const rawBonus = localStorage.getItem(STORAGE_KEYS.bonusLevels);
-    const bonusLevels = rawBonus ? JSON.parse(rawBonus) : [];
     
     const rawStars = localStorage.getItem(STORAGE_KEYS.bestStars);
     const starsMap = rawStars ? JSON.parse(rawStars) : {};
     
-    LEVELS.forEach(cfg => {
-        const btn = document.createElement('button');
-        btn.className = 'level-button';
-        const stars = starsMap[String(cfg.id)] || 0;
-        btn.innerText = stars > 0 ? `${cfg.id} (${stars}⭐)` : String(cfg.id);
-        btn.title = getLevelGroupName(cfg.id);
+    let totalStarsEarned = 0;
+    for (let lvlId in starsMap) {
+        totalStarsEarned += (starsMap[lvlId] || 0);
+    }
+    if (starsCountEl) {
+        starsCountEl.innerText = `${totalStarsEarned}/${QUARTIERS_ABIDJAN.length * 3}`;
+    }
+    
+    const nodeSpacingY = 94;
+    const startY = 70;
+    const totalHeight = startY + (QUARTIERS_ABIDJAN.length * nodeSpacingY) + 100;
+    gridContainer.style.height = `${totalHeight}px`;
+    if (svgPath) svgPath.style.height = `${totalHeight}px`;
+    
+    const points = [];
+    
+    QUARTIERS_ABIDJAN.forEach((q, idx) => {
+        const lvlNum = q.id;
+        // Winding S-curve: x varies smoothly between 22% and 78%
+        const pctX = 50 + 28 * Math.sin(idx * 0.92);
+        const posY = startY + (idx * nodeSpacingY);
         
-        // Unlocked if <= maxUnlocked OR in bonusLevels
-        const isUnlocked = (cfg.id <= maxUnlocked) || bonusLevels.includes(cfg.id);
+        points.push({ x: pctX, y: posY, id: lvlNum });
         
-        if (!isUnlocked) {
-            btn.disabled = true;
-            btn.classList.add('locked');
-        } else {
-            btn.addEventListener('click', () => {
-                levelSelectOverlay.classList.add('hidden');
-                startLevel(cfg.id);
-            });
-            if (bonusLevels.includes(cfg.id) && cfg.id > maxUnlocked) {
-                btn.style.border = '2px solid gold';
-                btn.style.boxShadow = '0 0 10px gold';
+        const isUnlocked = lvlNum <= maxUnlocked;
+        const isCurrent = lvlNum === level;
+        const stars = starsMap[String(lvlNum)] || 0;
+        
+        const nodeEl = document.createElement('div');
+        nodeEl.className = `map-node ${isUnlocked ? 'unlocked' : 'locked'} ${isCurrent ? 'current' : ''}`;
+        nodeEl.style.left = `${pctX}%`;
+        nodeEl.style.top = `${posY}px`;
+        
+        let starsHtml = '';
+        for (let s = 1; s <= 3; s++) {
+            starsHtml += `<i class="fas fa-star ${s <= stars ? '' : 'star-empty'}"></i>`;
+        }
+        
+        nodeEl.innerHTML = `
+            <div class="map-node-btn">
+                ${isUnlocked ? lvlNum : '<i class="fas fa-lock" style="font-size:0.9rem;"></i>'}
+            </div>
+            <div class="map-node-badge" style="border-left: 3px solid ${q.color}">
+                ${q.name}
+            </div>
+            <div class="map-node-stars">
+                ${starsHtml}
+            </div>
+        `;
+        
+        nodeEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isUnlocked) {
+                openLevelPreview(lvlNum, q, stars);
+            } else {
+                soundManager.playError();
+                vibrate([100, 50, 100]);
+                const prevName = QUARTIERS_ABIDJAN[lvlNum - 2] ? QUARTIERS_ABIDJAN[lvlNum - 2].name : 'précédent';
+                showToast(`Termine d'abord ${prevName} chef ! 🔒`);
+            }
+        });
+        
+        gridContainer.appendChild(nodeEl);
+    });
+    
+    // Draw Winding SVG Path
+    if (svgPath && points.length > 1) {
+        const svgWidth = gridContainer.clientWidth || window.innerWidth || 360;
+        let d = `M ${(points[0].x / 100) * svgWidth} ${points[0].y}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const x1 = (p1.x / 100) * svgWidth;
+            const y1 = p1.y;
+            const x2 = (p2.x / 100) * svgWidth;
+            const y2 = p2.y;
+            const midY = (y1 + y2) / 2;
+            d += ` C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+        }
+        
+        svgPath.innerHTML = `
+            <defs>
+                <linearGradient id="roadGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#FFE066" />
+                    <stop offset="50%" stop-color="#FF9F1C" />
+                    <stop offset="100%" stop-color="#E71D36" />
+                </linearGradient>
+            </defs>
+            <path d="${d}" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="14" stroke-linecap="round" />
+            <path d="${d}" fill="none" stroke="url(#roadGrad)" stroke-width="6" stroke-linecap="round" stroke-dasharray="10 8" />
+        `;
+    }
+    
+    // Auto-scroll to current node
+    setTimeout(() => {
+        const scrollArea = document.getElementById('abidjan-map-scroll');
+        const currentNode = gridContainer.querySelector('.map-node.current');
+        if (scrollArea && currentNode) {
+            const nodeTop = currentNode.offsetTop;
+            scrollArea.scrollTop = Math.max(0, nodeTop - (scrollArea.clientHeight / 2));
+        }
+    }, 150);
+}
+
+function openLevelPreview(lvlNum, quartier, stars) {
+    const modal = document.getElementById('level-preview-modal');
+    if (!modal) return;
+    
+    const cfg = LEVELS.find(l => l.id === lvlNum) || LEVELS[0];
+    
+    const communeEl = document.getElementById('preview-commune');
+    const titleEl = document.getElementById('preview-title');
+    const landmarkEl = document.getElementById('preview-landmark');
+    const movesEl = document.getElementById('preview-moves');
+    const bestScoreEl = document.getElementById('preview-best-score');
+    
+    if (communeEl) communeEl.innerText = quartier.commune;
+    if (titleEl) titleEl.innerText = `${lvlNum}. ${quartier.name}`;
+    if (landmarkEl) landmarkEl.innerText = quartier.landmark;
+    if (movesEl) movesEl.innerText = cfg.moves;
+    
+    const rawScores = localStorage.getItem(STORAGE_KEYS.bestScores);
+    const scoresMap = rawScores ? JSON.parse(rawScores) : {};
+    if (bestScoreEl) bestScoreEl.innerText = scoresMap[String(lvlNum)] || 0;
+    
+    const starsContainer = document.getElementById('preview-stars');
+    if (starsContainer) {
+        starsContainer.innerHTML = '';
+        for (let s = 1; s <= 3; s++) {
+            const star = document.createElement('i');
+            star.className = `fas fa-star ${s <= stars ? 'gold' : 'star-empty'}`;
+            star.style.color = s <= stars ? '#FFD700' : '#DDD';
+            star.style.margin = '0 3px';
+            starsContainer.appendChild(star);
+        }
+    }
+    
+    const goalsList = document.getElementById('preview-goals-list');
+    if (goalsList) {
+        goalsList.innerHTML = '';
+        for (let gid in cfg.goals) {
+            const ing = INGREDIENTS.find(i => i.id === gid);
+            if (ing) {
+                const item = document.createElement('div');
+                item.className = 'preview-goal-item';
+                item.innerHTML = `<span>${ing.emoji}</span> <span>${cfg.goals[gid]}</span>`;
+                goalsList.appendChild(item);
             }
         }
-        if (cfg.id === level) btn.classList.add('current');
-        levelGridEl.appendChild(btn);
-    });
-    levelSelectOverlay.classList.remove('hidden');
-    levelSelectOverlay.classList.add('active');
+    }
+    
+    const playBtn = document.getElementById('preview-play-btn');
+    if (playBtn) {
+        playBtn.onclick = () => {
+            modal.classList.add('hidden');
+            if (levelSelectOverlay) {
+                levelSelectOverlay.classList.remove('active');
+                levelSelectOverlay.classList.add('hidden');
+            }
+            startLevel(lvlNum);
+        };
+    }
+    
+    const closeBtn = document.getElementById('preview-close-btn');
+    if (closeBtn) {
+        closeBtn.onclick = () => modal.classList.add('hidden');
+    }
+    
+    modal.classList.remove('hidden');
 }
 
 function openDrawer() {
+    clearHint(); // Fix Capture 1: kill hand hint and cancel timer
     drawerMenu.classList.add('open');
     drawerOverlay.classList.remove('hidden');
 }
@@ -2177,26 +2773,114 @@ function togglePause() {
     const pauseBtn = document.getElementById('pause-btn');
     
     if (isPaused) {
+        clearHints();
         clearInterval(timerInterval);
         isProcessing = true; // Block game
         if (pauseBtn) pauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         
-        // Show Overlay
+        // Remove existing overlay if any
+        const oldOverlay = document.getElementById('pause-overlay');
+        if (oldOverlay) oldOverlay.remove();
+
+        // Show Overlay with Quick Settings & Close Cross
         const overlay = document.createElement('div');
         overlay.id = 'pause-overlay';
         overlay.innerHTML = `
-            <div>PAUSE</div>
-            <div style="font-size:1rem; margin:20px 0">Touche le bouton Play pour reprendre</div>
-            <div style="display:flex; flex-direction:column; gap:15px; align-items:center;">
-                <button id="resume-btn" class="modal-btn" style="background:#FFD700; color:#8B4513; margin:0;">
-                    <i class="fas fa-play"></i> Reprendre
+            <div class="pause-card">
+                <button id="pause-close-btn" class="pause-close-btn" type="button" aria-label="Fermer la pause">
+                    <i class="fas fa-times"></i>
                 </button>
-                <button id="menu-btn-pause" class="modal-btn" style="background:#FF4500; color:white; font-size:1rem; padding:8px 20px; margin:0;">
-                    <i class="fas fa-home"></i> Menu Principal
-                </button>
+                <div class="pause-title">PAUSE</div>
+                <p style="font-size:0.95rem; color:#FFE6A7; margin:0 0 14px;">Partie en pause</p>
+
+                <div class="pause-quick-controls">
+                    <div class="pause-control-row">
+                        <span><i class="fas fa-volume-up"></i> Son</span>
+                        <input type="range" id="pause-sound-volume" class="volume-slider" style="width: 130px;" min="0" max="100" value="${Math.round(soundVolume * 100)}">
+                    </div>
+                    <div class="pause-control-row">
+                        <span><i class="fas fa-music"></i> Musique</span>
+                        <input type="range" id="pause-music-volume" class="volume-slider" style="width: 130px;" min="0" max="100" value="${Math.round(musicVolume * 100)}">
+                    </div>
+                    <div class="pause-control-row">
+                        <span><i class="fas fa-mobile-alt"></i> Vibreur</span>
+                        <label class="switch" style="transform: scale(0.85); transform-origin: right center;">
+                            <input type="checkbox" id="pause-vibration-toggle" ${isVibrationOn ? 'checked' : ''}>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+                    <button id="resume-btn" class="modal-btn" style="background: linear-gradient(135deg, #00B074, #008156); color:white; font-size:1.15rem; font-weight:800; padding:12px 28px; border-radius:30px; border:2px solid rgba(255,255,255,0.7); box-shadow:0 6px 0 #00593B; margin:0; width:100%;">
+                        <i class="fas fa-play"></i> Reprendre
+                    </button>
+                    <button id="pause-settings-btn" class="modal-btn" style="background: linear-gradient(135deg, #E67E22, #D35400); color:white; font-size:1rem; font-weight:800; padding:11px 20px; border-radius:24px; border:1px solid rgba(255,255,255,0.6); margin:0; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(211,84,0,0.35);">
+                        <i class="fas fa-cog"></i> Tous les Paramètres
+                    </button>
+                    <button id="menu-btn-pause" class="modal-btn" style="background: rgba(255, 255, 255, 0.15); color:white; font-size:0.95rem; padding:10px 20px; border-radius:24px; border:1px solid rgba(255,255,255,0.4); margin:0; width:100%;">
+                        <i class="fas fa-home"></i> Menu Principal
+                    </button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
+
+        // Bind quick controls in pause modal
+        const pauseSoundVol = document.getElementById('pause-sound-volume');
+        if (pauseSoundVol) {
+            pauseSoundVol.addEventListener('input', (e) => {
+                soundVolume = parseInt(e.target.value, 10) / 100;
+                localStorage.setItem(STORAGE_KEYS.soundVolume, String(soundVolume));
+                const drawerSoundVol = document.getElementById('sound-volume');
+                if (drawerSoundVol) drawerSoundVol.value = e.target.value;
+            });
+        }
+
+        const pauseMusicVol = document.getElementById('pause-music-volume');
+        if (pauseMusicVol) {
+            pauseMusicVol.addEventListener('input', (e) => {
+                musicVolume = parseInt(e.target.value, 10) / 100;
+                localStorage.setItem(STORAGE_KEYS.musicVolume, String(musicVolume));
+                ambientSynth.updateVolume();
+                const drawerMusicVol = document.getElementById('music-volume');
+                if (drawerMusicVol) drawerMusicVol.value = e.target.value;
+            });
+        }
+
+        const pauseVibToggle = document.getElementById('pause-vibration-toggle');
+        if (pauseVibToggle) {
+            pauseVibToggle.addEventListener('change', () => {
+                isVibrationOn = pauseVibToggle.checked;
+                localStorage.setItem(STORAGE_KEYS.vibration, isVibrationOn ? 'on' : 'off');
+                const drawerVibToggle = document.getElementById('vibration-toggle');
+                if (drawerVibToggle) drawerVibToggle.checked = isVibrationOn;
+                if (isVibrationOn) vibrate(40);
+            });
+        }
+
+        // Close cross on pause modal: hides modal while leaving game paused
+        const pauseCloseBtn = document.getElementById('pause-close-btn');
+        if (pauseCloseBtn) {
+            pauseCloseBtn.addEventListener('click', () => {
+                const ov = document.getElementById('pause-overlay');
+                if (ov) ov.remove();
+                // Game remains paused: timer is stopped, pause button shows play icon
+                isPaused = true;
+                isProcessing = true;
+                if (pauseBtn) {
+                    pauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            });
+        }
+
+        // Direct Settings button in pause modal: opens drawer menu over pause overlay
+        const pauseSettingsBtn = document.getElementById('pause-settings-btn');
+        if (pauseSettingsBtn) {
+            pauseSettingsBtn.addEventListener('click', () => {
+                openDrawer();
+            });
+        }
 
         document.getElementById('resume-btn').addEventListener('click', togglePause);
         document.getElementById('menu-btn-pause').addEventListener('click', () => {
@@ -2279,6 +2963,18 @@ function startLevel(lvl, resume = false) {
         console.log("[DEBUG] Updating UI...");
         checkDailyReward();
         renderGoals(); // Initial Render
+        
+        // Timer d'Intervention du Chef Garbaman (Toutes les 15s)
+        if (window.chefHelperInterval) clearInterval(window.chefHelperInterval);
+        window.lastPlayerActionTime = Date.now();
+        window.chefHelperInterval = setInterval(() => {
+            if (isPaused || isProcessing || moves <= 0) return;
+            const now = Date.now();
+            if (now - (window.lastPlayerActionTime || now) >= 14000) {
+                window.lastPlayerActionTime = now;
+                spawnChefJokerHelper();
+            }
+        }, 2000);
         updateUI();
         if (modalOverlay) modalOverlay.classList.add('hidden');
         updateTileSize();
@@ -2333,59 +3029,137 @@ function resetHintTimer() {
 }
 
 function clearHints() {
+    clearTimeout(hintTimeout);
     if (currentHint) {
         currentHint.forEach(el => {
-            if (el.classList.contains('tile')) el.classList.remove('hint-anim');
-            if (el.classList.contains('hand-hint')) el.remove();
+            if (el && el.classList) {
+                el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-anim');
+            }
+            if (el && el.classList && el.classList.contains('hand-hint')) {
+                el.remove();
+            }
         });
         currentHint = null;
     }
+    // Remove any stray hints in DOM
+    document.querySelectorAll('.hand-hint').forEach(h => h.remove());
+    document.querySelectorAll('.hint-source-tile, .hint-target-tile, .hint-anim').forEach(el => {
+        el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-anim');
+    });
 }
+const clearHint = clearHints;
 
 async function showHint() {
-    // Brute force find a move
+    clearHints();
+    if (moves <= 0 || isPaused || isProcessing) return;
+
+    const candidateMoves = [];
+
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            // Check Right
-            if (c < GRID_SIZE - 1) {
-                if (await checkSwapForMatch(r, c, r, c + 1)) {
-                    clearHints();
-                    applyHint(r, c, r, c + 1);
-                    return;
-                }
-            }
-            // Check Down
-            if (r < GRID_SIZE - 1) {
-                if (await checkSwapForMatch(r, c, r + 1, c)) {
-                    clearHints();
-                    applyHint(r, c, r + 1, c);
-                    return;
+            const t1 = grid[r][c];
+            if (!t1 || isObstacleId(t1.type.id)) continue;
+
+            const neighbors = [
+                { r: r, c: c + 1 }, // Right
+                { r: r + 1, c: c }  // Down
+            ];
+
+            for (const n of neighbors) {
+                if (n.r >= GRID_SIZE || n.c >= GRID_SIZE) continue;
+                const t2 = grid[n.r][n.c];
+                if (!t2 || isObstacleId(t2.type.id)) continue;
+
+                // CRITICAL: NEVER SWAP IDENTICAL TILES!
+                if (t1.type.id === t2.type.id) continue;
+
+                // Virtual swap
+                const type1 = t1.type;
+                const type2 = t2.type;
+                t1.type = type2;
+                t2.type = type1;
+
+                const match1 = getRunPositionsAt(r, c);
+                const match2 = getRunPositionsAt(n.r, n.c);
+
+                // Revert swap immediately
+                t1.type = type1;
+                t2.type = type2;
+
+                const hasMatch1 = match1.length >= 3;
+                const hasMatch2 = match2.length >= 3;
+
+                if (hasMatch1 || hasMatch2) {
+                    let moveInfo;
+                    if (hasMatch1 && hasMatch2) {
+                        moveInfo = {
+                            from: { r: n.r, c: n.c },
+                            to: { r: r, c: c },
+                            matchedPositions: [...match1, ...match2],
+                            matchedType: type2.id
+                        };
+                    } else if (hasMatch1) {
+                        // t2 moved to (r, c)
+                        moveInfo = {
+                            from: { r: n.r, c: n.c },
+                            to: { r: r, c: c },
+                            matchedPositions: match1,
+                            matchedType: type2.id
+                        };
+                    } else {
+                        // t1 moved to (n.r, n.c)
+                        moveInfo = {
+                            from: { r: r, c: c },
+                            to: { r: n.r, c: n.c },
+                            matchedPositions: match2,
+                            matchedType: type1.id
+                        };
+                    }
+
+                    // Score candidate: prioritize current level goals!
+                    const isGoal = currentGoals && currentGoals[moveInfo.matchedType] && 
+                                   (goalProgress[moveInfo.matchedType] || 0) < currentGoals[moveInfo.matchedType];
+                    moveInfo.priority = isGoal ? 10 + moveInfo.matchedPositions.length : moveInfo.matchedPositions.length;
+                    candidateMoves.push(moveInfo);
                 }
             }
         }
     }
-    handleNoMovesAvailable();
+
+    if (candidateMoves.length === 0) {
+        handleNoMovesAvailable();
+        return;
+    }
+
+    // Pick highest priority move (prioritizes level goals!)
+    candidateMoves.sort((a, b) => b.priority - a.priority);
+    const bestMove = candidateMoves[0];
+
+    applySmartHint(bestMove);
 }
 
-async function checkSwapForMatch(r1, c1, r2, c2) {
-    // Virtual swap
+function checkSwapForMatch(r1, c1, r2, c2) {
     const t1 = grid[r1][c1];
     const t2 = grid[r2][c2];
-    
     if (!t1 || !t2 || isObstacleId(t1.type.id) || isObstacleId(t2.type.id)) return false;
-
-    // Swap types temporarily
-    const temp = t1.type;
-    t1.type = t2.type;
-    t2.type = temp;
     
-    // Check local matches (simplified)
+    // Any swap involving Color Bomb is ALWAYS a valid move!
+    if (isColorBombTile(t1) || isColorBombTile(t2)) return true;
+    
+    // Any swap between two Special Tiles is ALWAYS a valid move!
+    if (isSpecialTile(t1) && isSpecialTile(t2)) return true;
+    
+    if (t1.type.id === t2.type.id) return false;
+
+    const type1 = t1.type;
+    const type2 = t2.type;
+    t1.type = type2;
+    t2.type = type1;
+    
     const hasMatch = checkMatchAt(r1, c1) || checkMatchAt(r2, c2);
     
-    // Swap back
-    t1.type = t2.type;
-    t2.type = temp;
-    
+    t1.type = type1;
+    t2.type = type2;
     return hasMatch;
 }
 
@@ -2439,51 +3213,85 @@ function getRunPositionsAt(r, c) {
     });
 }
 
-function applyHint(r1, c1, r2, c2) {
-    const el1 = grid[r1][c1].el;
-    const el2 = grid[r2][c2].el;
-    el1.classList.add('hint-anim');
-    el2.classList.add('hint-anim');
+function applySmartHint(move) {
+    const fromTile = grid[move.from.r][move.from.c];
+    const toTile = grid[move.to.r][move.to.c];
+    if (!fromTile || !toTile || !fromTile.el || !toTile.el) return;
 
-    // Emphasize actual match group after swap (visual clarity)
-    const t1 = grid[r1][c1];
-    const t2 = grid[r2][c2];
-    if (t1 && t2) {
-        const temp = t1.type;
-        t1.type = t2.type;
-        t2.type = temp;
-        const group = [...getRunPositionsAt(r1, c1), ...getRunPositionsAt(r2, c2)];
-        // revert
-        t1.type = t2.type;
-        t2.type = temp;
-        const seen = new Set();
-        group.forEach(p => {
-            const key = `${p.r},${p.c}`;
-            if (seen.has(key)) return;
-            seen.add(key);
-            const tile = grid[p.r][p.c];
-            if (tile && tile.el) tile.el.classList.add('hint-anim');
-        });
-    }
-    
-    // Hand logic
+    const fromEl = fromTile.el;
+    const toEl = toTile.el;
+
+    // Highlight source mover tile with glowing cyan border
+    fromEl.classList.add('hint-source-tile');
+
+    // Highlight target matching tiles with glowing gold
+    const highlightedElements = [fromEl];
+    move.matchedPositions.forEach(p => {
+        const t = grid[p.r][p.c];
+        if (t && t.el) {
+            t.el.classList.add('hint-target-tile');
+            highlightedElements.push(t.el);
+        }
+    });
+
+    // Create 3D cartoon pointer hand
     const hand = document.createElement('div');
     hand.className = 'hand-hint';
-    const rect1 = el1.getBoundingClientRect();
-    const rect2 = el2.getBoundingClientRect();
-    
-    hand.style.left = (rect1.left + rect1.width/2 - 20) + 'px'; // 20 is half width
-    hand.style.top = (rect1.top + rect1.height/2 - 20) + 'px';
-    
-    const dx = (rect2.left - rect1.left);
-    const dy = (rect2.top - rect1.top);
-    
+
+    // SVG of crisp 3D glove with glowing cyan ripple
+    hand.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="54" height="54">
+            <defs>
+                <radialGradient id="touchGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.95"/>
+                    <stop offset="50%" stop-color="#00E5FF" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="gloveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FFFFFF"/>
+                    <stop offset="55%" stop-color="#EDF2F7"/>
+                    <stop offset="100%" stop-color="#CBD5E1"/>
+                </linearGradient>
+                <linearGradient id="cuffGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FF9E00"/>
+                    <stop offset="100%" stop-color="#D97706"/>
+                </linearGradient>
+            </defs>
+            <!-- Glowing touch point at fingertip -->
+            <circle cx="15" cy="15" r="14" fill="url(#touchGlow)"/>
+            <circle cx="15" cy="15" r="4.5" fill="#00E5FF"/>
+            
+            <!-- Cartoon 3D Hand Pointer -->
+            <g transform="translate(6, 6)">
+                <!-- Drop shadow -->
+                <path d="M 9 9 C 9 4, 15 4, 15 9 L 15 24 L 21 22 C 25 21, 28 24, 27 28 L 24 38 C 23 43, 17 47, 11 46 C 5 45, 3 40, 3 35 L 3 24 C 3 20, 9 20, 9 24 Z" fill="rgba(0,0,0,0.28)" transform="translate(2, 3)"/>
+                <!-- White Glove Body -->
+                <path d="M 9 7 C 9 3, 15 3, 15 7 L 15 23 C 17 21, 20 21, 22 23 C 25 25, 25 28, 23 30 L 21 32 C 23 33, 24 36, 22 38 C 20 41, 15 44, 11 44 C 6 44, 3 40, 3 35 L 3 25 C 3 21, 8 21, 9 24 Z" fill="url(#gloveGrad)" stroke="#1E293B" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+                <!-- Finger fold lines -->
+                <path d="M 13 25 C 15 24, 18 25, 19 27" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" fill="none"/>
+                <path d="M 12 32 C 14 31, 17 32, 18 34" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" fill="none"/>
+                <!-- Orange Ivorian Cuff -->
+                <rect x="3" y="40" width="14" height="6" rx="3" fill="url(#cuffGrad)" stroke="#78350F" stroke-width="1.6"/>
+            </g>
+        </svg>
+    `;
+
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    hand.style.left = (fromRect.left + fromRect.width / 2 - 15) + 'px';
+    hand.style.top = (fromRect.top + fromRect.height / 2 - 15) + 'px';
+
+    const dx = toRect.left - fromRect.left;
+    const dy = toRect.top - fromRect.top;
+
     hand.style.setProperty('--dx', `${dx}px`);
     hand.style.setProperty('--dy', `${dy}px`);
-    
+
     document.body.appendChild(hand);
-    
-    currentHint = [el1, el2, hand];
+
+    highlightedElements.push(hand);
+    currentHint = highlightedElements;
 }
 
 function updateTimerUI() {
@@ -2507,7 +3315,7 @@ function handleGameOver() {
     setTimeout(() => {
         vibrate([200, 120, 200, 120, 260]);
         document.getElementById('modal-title').innerText = "YAKO !";
-        document.getElementById('modal-message').innerHTML = `<b>${playerName}</b>, le temps est écoulé !<br>Score : ${score}`;
+        document.getElementById('modal-message').innerHTML = `<b>${escapeHtml(playerName)}</b>, le temps est écoulé !<br>Score : ${score}`;
         document.getElementById('modal-btn').innerText = "Recommencer";
         
         modalBtn.onclick = () => {
@@ -2523,7 +3331,7 @@ function handleNoMovesAvailable() {
     vibrate([100, 80, 100]);
     const msg = document.createElement('div');
     msg.id = 'nomove-msg';
-    msg.innerHTML = `${playerName}, y'a plus de coups là...<br><strong>On mélange le Dabali !</strong>`;
+    msg.innerHTML = `${escapeHtml(playerName)}, y'a plus de coups là...<br><strong>On mélange le Dabali !</strong>`;
     msg.style.position = 'fixed';
     msg.style.top = '50%';
     msg.style.left = '50%';
@@ -2649,6 +3457,13 @@ function createGrid(obstacleCount = 0) {
 
 function renderGoals() {
     footerGoalsEl.innerHTML = '';
+    const goalCount = Object.keys(currentGoals).length;
+    if (goalCount >= 4) {
+        footerGoalsEl.classList.add('compact-goals');
+    } else {
+        footerGoalsEl.classList.remove('compact-goals');
+    }
+
     for (let id in currentGoals) {
         const target = currentGoals[id];
         const current = goalProgress[id];
@@ -2660,8 +3475,9 @@ function renderGoals() {
         el.className = 'goal-item';
         el.id = `goal-item-${id}`;
         
+        const iconSize = goalCount >= 4 ? 24 : 30;
         const iconContent = ing.image ? 
-            `<img src="${ing.image}" style="width:30px; height:30px; object-fit:contain;">` : 
+            `<img src="${ing.image}" style="width:${iconSize}px; height:${iconSize}px; object-fit:contain;">` : 
             ing.emoji;
 
         el.innerHTML = `
@@ -2679,7 +3495,31 @@ function renderGoals() {
 }
 
 function createRandomTile(r, c) {
-    const type = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
+    // Équilibrage intelligent : Tous les ingrédients demandés en objectifs DOIVENT être dans le pool !
+    let availablePool = [];
+    const currentLvlCfg = (typeof LEVELS !== 'undefined' && typeof level !== 'undefined') ? 
+        (LEVELS.find(l => l.id === level) || LEVELS[0]) : null;
+
+    if (currentLvlCfg && currentLvlCfg.goals) {
+        const goalIds = Object.keys(currentLvlCfg.goals);
+        const goalIngs = INGREDIENTS.filter(i => goalIds.includes(i.id));
+        const nonGoalIngs = INGREDIENTS.filter(i => !goalIds.includes(i.id));
+        
+        // Taille de pool adaptée : Niv 1 = 5, Niv 2-3 = 6, supérieurs = 6-7
+        const targetPoolSize = (typeof level !== 'undefined' && level === 1) ? 5 : 
+                               (typeof level !== 'undefined' && level <= 3) ? 6 : 7;
+        availablePool = [...goalIngs];
+        for (const ing of nonGoalIngs) {
+            if (availablePool.length >= targetPoolSize) break;
+            availablePool.push(ing);
+        }
+    } else {
+        const poolSize = (typeof level !== 'undefined' && level === 1) ? 5 :
+                         (typeof level !== 'undefined' && level <= 3) ? 6 : INGREDIENTS.length;
+        availablePool = INGREDIENTS.slice(0, poolSize);
+    }
+
+    const type = availablePool[Math.floor(Math.random() * availablePool.length)];
     const el = document.createElement('div');
     el.className = 'tile';
     renderTileContent(el, type);
@@ -2704,29 +3544,215 @@ function createRandomTile(r, c) {
 }
 
 function renderTileContent(el, type) {
+    if (!el || !type) return;
     el.classList.remove(
-        'tile-attieke',
-        'tile-poisson',
-        'tile-piment',
-        'tile-oignon',
-        'tile-tomate',
-        'tile-maggi',
-        'tile-huile'
+        "tile-attieke",
+        "tile-poisson",
+        "tile-piment",
+        "tile-oignon",
+        "tile-tomate",
+        "tile-alloco",
+        "tile-sachet",
+        "tile-joker",
+        "tile-maggi",
+        "tile-huile",
+        "tile-color-bomb",
+        "tile-special-striped-h",
+        "tile-special-striped-v",
+        "tile-special-wrapped"
     );
+    if (type.id === "color_bomb" || type.special === "color_bomb") {
+        el.classList.add("tile-color-bomb");
+        el.innerHTML = `<span style="font-size:1.55rem; pointer-events:none; filter:drop-shadow(0 0 5px gold);">🌟</span>`;
+        el.style.fontSize = "";
+        return;
+    }
+    if (type.id === "joker" || type.special === "joker") {
+        el.classList.add("tile-joker");
+        el.innerHTML = `<span style="font-size:1.6rem; pointer-events:none; filter:drop-shadow(0 0 6px #00FFFF);">⚡🌟</span>`;
+        el.style.fontSize = "";
+        return;
+    }
     if (type.image) {
-        // Add pointer-events: none to image to ensure clicks pass through to the tile div
         el.innerHTML = `<img src="${type.image}" alt="${type.name}" style="width:80%; height:80%; object-fit:contain; pointer-events:none;">`;
-        el.style.fontSize = '';
+        el.style.fontSize = "";
     } else {
-        el.innerText = type.emoji;
-        el.innerHTML = type.emoji; // Use innerHTML to be safe
-        el.style.fontSize = '';
+        el.innerText = type.emoji || "";
+        el.innerHTML = type.emoji || "";
+        el.style.fontSize = "";
     }
     if (type.id) {
         el.classList.add(`tile-${type.id}`);
     }
+    if (type.special === "striped_h") {
+        el.classList.add("tile-special-striped-h");
+    } else if (type.special === "striped_v") {
+        el.classList.add("tile-special-striped-v");
+    } else if (type.special === "wrapped") {
+        el.classList.add("tile-special-wrapped");
+    }
 }
 
+
+// CELESTIAL STRIKES & FLYING BRAISED FISH
+async function triggerCelestialStrike(sourceTile, meteorCount = 4) {
+    if (!gridEl) return;
+    
+    const orb = document.createElement("div");
+    orb.className = "celestial-orb-ascend";
+    let startX = window.innerWidth / 2;
+    let startY = window.innerHeight / 2;
+    if (sourceTile && sourceTile.el) {
+        const rect = sourceTile.el.getBoundingClientRect();
+        startX = rect.left + rect.width / 2;
+        startY = rect.top + rect.height / 2;
+    }
+    orb.style.left = `${startX}px`;
+    orb.style.top = `${startY}px`;
+    document.body.appendChild(orb);
+    setTimeout(() => orb.remove(), 550);
+    
+    soundManager.playLaserShoot();
+    
+    await new Promise(r => setTimeout(r, 260));
+    const flash = document.createElement("div");
+    flash.className = "sky-thunder-flash";
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 450);
+    soundManager.playThunderImpact();
+    
+    const candidates = [];
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const t = grid[r][c];
+            if (t && t.type.id !== "hole") candidates.push(t);
+        }
+    }
+    if (candidates.length === 0) return;
+    
+    candidates.sort((a, b) => {
+        const aObs = isObstacleId(a.type.id) ? 2 : 0;
+        const bObs = isObstacleId(b.type.id) ? 2 : 0;
+        const aGoal = (currentGoals[a.type.id] && goalProgress[a.type.id] < currentGoals[a.type.id]) ? 1 : 0;
+        const bGoal = (currentGoals[b.type.id] && goalProgress[b.type.id] < currentGoals[b.type.id]) ? 1 : 0;
+        return (bObs + bGoal) - (aObs + aGoal) + (Math.random() - 0.5);
+    });
+    
+    const targets = candidates.slice(0, Math.min(meteorCount, candidates.length));
+    
+    targets.forEach((target, idx) => {
+        setTimeout(() => {
+            if (!target || !target.el) return;
+            const rect = target.el.getBoundingClientRect();
+            const tx = rect.left + rect.width / 2;
+            const ty = rect.top + rect.height / 2;
+            
+            const meteor = document.createElement("div");
+            meteor.className = "celestial-meteor-fall";
+            meteor.style.left = `${tx - 4}px`;
+            meteor.style.top = "0px";
+            meteor.style.height = `${ty}px`;
+            document.body.appendChild(meteor);
+            setTimeout(() => meteor.remove(), 380);
+            
+            setTimeout(() => {
+                const imp = document.createElement("div");
+                imp.className = "celestial-impact-flash";
+                imp.style.left = `${tx}px`;
+                imp.style.top = `${ty}px`;
+                document.body.appendChild(imp);
+                setTimeout(() => imp.remove(), 400);
+                
+                showFloatingScore(tx, ty - 20, "+800 FRAPPE CÉLESTE ! ⚡", "#00FFFF");
+                soundManager.playThunderImpact();
+                triggerShake("heavy");
+            }, 120);
+        }, idx * 110);
+    });
+    
+    await new Promise(r => setTimeout(r, targets.length * 110 + 260));
+    score += targets.length * 200;
+    await processMatches(targets);
+}
+
+async function spawnFlyingFish(sourceTile, fishCount = 3) {
+    if (!gridEl) return;
+    
+    let originX = window.innerWidth / 2;
+    let originY = window.innerHeight / 2;
+    if (sourceTile && sourceTile.el) {
+        const rct = sourceTile.el.getBoundingClientRect();
+        originX = rct.left + rct.width / 2;
+        originY = rct.top + rct.height / 2;
+    }
+    
+    const pool = [];
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const t = grid[r][c];
+            if (t && t.type.id !== "hole" && t !== sourceTile) pool.push(t);
+        }
+    }
+    if (pool.length === 0) return;
+    
+    pool.sort((a, b) => {
+        const aGoal = (currentGoals[a.type.id] && goalProgress[a.type.id] < currentGoals[a.type.id]) ? 3 : 0;
+        const bGoal = (currentGoals[b.type.id] && goalProgress[b.type.id] < currentGoals[b.type.id]) ? 3 : 0;
+        const aObs = isObstacleId(a.type.id) ? 2 : 0;
+        const bObs = isObstacleId(b.type.id) ? 2 : 0;
+        return (bGoal + bObs) - (aGoal + aObs) + (Math.random() - 0.5);
+    });
+    
+    const targets = pool.slice(0, Math.min(fishCount, pool.length));
+    soundManager.playFishSizzle();
+    
+    targets.forEach((target, i) => {
+        const fishEl = document.createElement("div");
+        fishEl.className = "flying-braised-fish";
+        fishEl.innerHTML = '<span style="display:inline-block; transform: scaleX(-1);">🐟</span>';
+        fishEl.style.left = `${originX - 22}px`;
+        fishEl.style.top = `${originY - 22}px`;
+        document.body.appendChild(fishEl);
+        
+        const spreadX = (i - 1) * 70;
+        const peakY = originY - 140 - Math.random() * 40;
+        
+        fishEl.style.transform = `translate(${spreadX}px, ${peakY - originY}px) scale(1.3) rotate(${spreadX > 0 ? 30 : -30}deg)`;
+        
+        setTimeout(() => {
+            if (!target || !target.el) {
+                fishEl.remove();
+                return;
+            }
+            const tgtRect = target.el.getBoundingClientRect();
+            const tx = tgtRect.left + tgtRect.width / 2;
+            const ty = tgtRect.top + tgtRect.height / 2;
+            const dx = tx - originX;
+            const dy = ty - originY;
+            
+            fishEl.style.transform = `translate(${dx}px, ${dy}px) scale(0.9) rotate(90deg)`;
+            
+            setTimeout(() => {
+                fishEl.remove();
+                const imp = document.createElement("div");
+                imp.className = "bomb-center-flash";
+                imp.style.background = "radial-gradient(circle, #FFFFFF 0%, #FFD700 45%, #FF8C00 70%, transparent 100%)";
+                imp.style.left = `${tx}px`;
+                imp.style.top = `${ty}px`;
+                document.body.appendChild(imp);
+                setTimeout(() => imp.remove(), 350);
+                
+                showFloatingScore(tx, ty - 20, "+300 POISSON BRAISÉ ! 🐟⚡", "#FFD700");
+                soundManager.playFishSizzle();
+                triggerShake("medium");
+            }, 420);
+        }, 280);
+    });
+    
+    await new Promise(r => setTimeout(r, 750));
+    score += targets.length * 150;
+    await processMatches(targets);
+}
 // INPUT HANDLING (Swipe & Click)
 let touchStartX = 0;
 let touchStartY = 0;
@@ -2736,6 +3762,7 @@ let longPressTarget = null;
 let isLongPressActive = false;
 
 function handleInputStart(e) {
+    window.lastPlayerActionTime = Date.now();
     if (isProcessing || moves <= 0 || isPaused) return; 
     
     // Improved target detection
@@ -2922,12 +3949,322 @@ function getTileFromEl(el) {
     return null;
 }
 
+async function checkAndExecuteSuperCombo(tile1, tile2) {
+    const isT1Special = isSpecialTile(tile1);
+    const isT2Special = isSpecialTile(tile2);
+    const isT1ColorBomb = isColorBombTile(tile1);
+    const isT2ColorBomb = isColorBombTile(tile2);
+    const isT1Joker = tile1.type.id === "joker" || tile1.type.special === "joker";
+    const isT2Joker = tile2.type.id === "joker" || tile2.type.special === "joker";
+    
+    // 0. JOKER ÉCLAIR UNIVERSEL (Foudroie toutes les pièces du type swipé !)
+    if (isT1Joker || isT2Joker) {
+        const jokerTile = isT1Joker ? tile1 : tile2;
+        const targetTile = jokerTile === tile1 ? tile2 : tile1;
+        await swapTilesVisual(tile1, tile2);
+        
+        const targetId = targetTile.type.id;
+        const targets = [];
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const t = grid[r][c];
+                if (t && t.type.id === targetId && t !== jokerTile) targets.push(t);
+            }
+        }
+        
+        soundManager.playLightningZap();
+        const jRect = jokerTile.el.getBoundingClientRect();
+        const jX = jRect.left + jRect.width / 2;
+        const jY = jRect.top + jRect.height / 2;
+        
+        const targetPoints = targets.map(t => {
+            const rct = t.el.getBoundingClientRect();
+            return { x: rct.left + rct.width / 2, y: rct.top + rct.height / 2 };
+        });
+        showLightningArcs(jX, jY, targetPoints);
+        
+        await new Promise(r => setTimeout(r, 260));
+        triggerShake("heavy");
+        soundManager.playThunderImpact();
+        
+        const toDestroy = new Set([jokerTile, ...targets]);
+        const bonus = targets.length * 100 + 1500;
+        score += bonus;
+        showFloatingScore(jX, jY - 30, `+${bonus} JOKER ÉCLAIR ! ⚡💥`, "#00FFFF");
+        await new Promise(r => setTimeout(r, 220));
+        await processMatches(Array.from(toDestroy));
+        return true;
+    }
+    
+    if (!isT1Special && !isT2Special) return false;
+    
+    // 1. Double Color Bomb (Grand Menage d'Abidjan)
+    if (isT1ColorBomb && isT2ColorBomb) {
+        await swapTilesVisual(tile1, tile2);
+        swapTilesData(tile1, tile2);
+        triggerShake("mega");
+        soundManager.playColorBombMega();
+        const rect = tile2.el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        showFloatingScore(cx, cy, "+10000 GRAND MÉNAGE D'ABIDJAN ! 👑", "#FFD700");
+        
+        const allTiles = [];
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const t = grid[r][c];
+                if (t && !isObstacleId(t.type.id)) allTiles.push(t);
+            }
+        }
+        score += 10000;
+        await processMatches(allTiles);
+        return true;
+    }
+    
+    // 2. Color Bomb + Special or Normal Ingredient
+    if (isT1ColorBomb || isT2ColorBomb) {
+        const colorBomb = isT1ColorBomb ? tile1 : tile2;
+        const other = colorBomb === tile1 ? tile2 : tile1;
+        await swapTilesVisual(tile1, tile2);
+        
+        const cbRect = colorBomb.el.getBoundingClientRect();
+        const cbX = cbRect.left + cbRect.width / 2;
+        const cbY = cbRect.top + cbRect.height / 2;
+        
+        // 2A. Color Bomb + Striped (THE VIDEO 2 SIGNATURE COMBO!)
+        if (isStripedTile(other)) {
+            const targetId = other.type.id;
+            const targets = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const t = grid[r][c];
+                    if (t && t.type.id === targetId && t !== colorBomb) targets.push(t);
+                }
+            }
+            
+            soundManager.playLightningZap();
+            const targetPoints = targets.map(t => {
+                const rct = t.el.getBoundingClientRect();
+                return { x: rct.left + rct.width / 2, y: rct.top + rct.height / 2 };
+            });
+            showLightningArcs(cbX, cbY, targetPoints);
+            
+            // Wait 250ms for lightning impact, then transform all targets into striped candies!
+            await new Promise(r => setTimeout(r, 250));
+            targets.forEach(t => {
+                t.type = { ...t.type, special: Math.random() < 0.5 ? "striped_h" : "striped_v" };
+                renderTileContent(t.el, t.type);
+                t.el.classList.add("pop-anim");
+            });
+            
+            // Wait 300ms, then detonate all striped candies simultaneously!
+            await new Promise(r => setTimeout(r, 300));
+            triggerShake("mega");
+            soundManager.playLaserShoot();
+            
+            const toDestroy = new Set([colorBomb, other]);
+            targets.forEach(st => {
+                toDestroy.add(st);
+                if (st.type.special === "striped_h") {
+                    showLaserBeam("row", st.r, 1);
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (grid[st.r][c] && !isObstacleId(grid[st.r][c].type.id)) toDestroy.add(grid[st.r][c]);
+                    }
+                } else {
+                    showLaserBeam("col", st.c, 1);
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        if (grid[r][st.c] && !isObstacleId(grid[r][st.c].type.id)) toDestroy.add(grid[r][st.c]);
+                    }
+                }
+            });
+            
+            const bonus = toDestroy.size * 70 + 3000;
+            score += bonus;
+            showFloatingScore(cbX, cbY - 30, `+${bonus} FESTIVAL DE GARBA ! 🔥`, "#FFD700");
+            await new Promise(r => setTimeout(r, 260));
+            await processMatches(Array.from(toDestroy));
+            return true;
+        }
+        
+        // 2B. Color Bomb + Wrapped
+        if (isWrappedTile(other)) {
+            const targetId = other.type.id;
+            const targets = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const t = grid[r][c];
+                    if (t && t.type.id === targetId && t !== colorBomb) targets.push(t);
+                }
+            }
+            soundManager.playLightningZap();
+            const targetPoints = targets.map(t => {
+                const rct = t.el.getBoundingClientRect();
+                return { x: rct.left + rct.width / 2, y: rct.top + rct.height / 2 };
+            });
+            showLightningArcs(cbX, cbY, targetPoints);
+            
+            await new Promise(r => setTimeout(r, 250));
+            targets.forEach(t => {
+                t.type = { ...t.type, special: "wrapped" };
+                renderTileContent(t.el, t.type);
+                t.el.classList.add("pop-anim");
+            });
+            
+            await new Promise(r => setTimeout(r, 300));
+            triggerShake("heavy");
+            soundManager.playWrappedBomb();
+            
+            const toDestroy = new Set([colorBomb, other]);
+            targets.forEach(wt => {
+                toDestroy.add(wt);
+                createWrappedExplosion(wt);
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const nr = wt.r + dr;
+                        const nc = wt.c + dc;
+                        if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                            if (grid[nr][nc] && !isObstacleId(grid[nr][nc].type.id)) toDestroy.add(grid[nr][nc]);
+                        }
+                    }
+                }
+            });
+            const bonus = toDestroy.size * 70 + 2500;
+            score += bonus;
+            showFloatingScore(cbX, cbY - 30, `+${bonus} DÉLUGE DE MARMITES ! 🍲`, "#FFD700");
+            await new Promise(r => setTimeout(r, 260));
+            await processMatches(Array.from(toDestroy));
+            return true;
+        }
+        
+        // 2C. Color Bomb + Normal Ingredient
+        if (!isObstacleId(other.type.id)) {
+            const targetId = other.type.id;
+            const targets = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const t = grid[r][c];
+                    if (t && t.type.id === targetId && t !== colorBomb) targets.push(t);
+                }
+            }
+            soundManager.playLightningZap();
+            const targetPoints = targets.map(t => {
+                const rct = t.el.getBoundingClientRect();
+                return { x: rct.left + rct.width / 2, y: rct.top + rct.height / 2 };
+            });
+            showLightningArcs(cbX, cbY, targetPoints);
+            
+            await new Promise(r => setTimeout(r, 250));
+            triggerShake("medium");
+            soundManager.playImpact();
+            
+            const toDestroy = new Set([colorBomb, ...targets]);
+            const bonus = targets.length * 80 + 1000;
+            score += bonus;
+            showFloatingScore(cbX, cbY - 30, `+${bonus} FOUDRE D'ATTIÉKÉ ! ⚡`, "#FFD700");
+            await new Promise(r => setTimeout(r, 200));
+            await processMatches(Array.from(toDestroy));
+            return true;
+        }
+    }
+    
+    // 3. Striped + Striped (Giant Cross 1-line x 1-col)
+    if (isStripedTile(tile1) && isStripedTile(tile2)) {
+        await swapTilesVisual(tile1, tile2);
+        swapTilesData(tile1, tile2);
+        const center = tile2;
+        soundManager.playLaserShoot();
+        triggerShake("heavy");
+        showLaserBeam("row", center.r, 1);
+        showLaserBeam("col", center.c, 1);
+        
+        const toDestroy = new Set([tile1, tile2]);
+        for (let c = 0; c < GRID_SIZE; c++) {
+            if (grid[center.r][c] && !isObstacleId(grid[center.r][c].type.id)) toDestroy.add(grid[center.r][c]);
+        }
+        for (let r = 0; r < GRID_SIZE; r++) {
+            if (grid[r][center.c] && !isObstacleId(grid[r][center.c].type.id)) toDestroy.add(grid[r][center.c]);
+        }
+        const rect = center.el.getBoundingClientRect();
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 20, "+1200 CROIX LASER ! ⚡", "#00FFFF");
+        score += 1200;
+        await new Promise(r => setTimeout(r, 250));
+        await processMatches(Array.from(toDestroy));
+        return true;
+    }
+    
+    // 4. Striped + Wrapped (Video 3 Combo: Giant 3-row x 3-col Triple Laser)
+    if ((isStripedTile(tile1) && isWrappedTile(tile2)) || (isWrappedTile(tile1) && isStripedTile(tile2))) {
+        await swapTilesVisual(tile1, tile2);
+        swapTilesData(tile1, tile2);
+        const center = tile2;
+        soundManager.playLaserShoot();
+        soundManager.playWrappedBomb();
+        triggerShake("heavy");
+        
+        showLaserBeam("row", center.r, 3);
+        showLaserBeam("col", center.c, 3);
+        
+        const toDestroy = new Set([tile1, tile2]);
+        for (let dr = -1; dr <= 1; dr++) {
+            const r = center.r + dr;
+            if (r >= 0 && r < GRID_SIZE) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (grid[r][c] && !isObstacleId(grid[r][c].type.id)) toDestroy.add(grid[r][c]);
+                }
+            }
+        }
+        for (let dc = -1; dc <= 1; dc++) {
+            const c = center.c + dc;
+            if (c >= 0 && c < GRID_SIZE) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    if (grid[r][c] && !isObstacleId(grid[r][c].type.id)) toDestroy.add(grid[r][c]);
+                }
+            }
+        }
+        const rect = center.el.getBoundingClientRect();
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+2500 MÉGA RAYON TRIPLE ! 💥", "#FFD700");
+        score += 2500;
+        await new Promise(r => setTimeout(r, 280));
+        await processMatches(Array.from(toDestroy));
+        return true;
+    }
+    
+    // 5. Wrapped + Wrapped (Gigantic 5x5 explosion)
+    if (isWrappedTile(tile1) && isWrappedTile(tile2)) {
+        await swapTilesVisual(tile1, tile2);
+        swapTilesData(tile1, tile2);
+        const center = tile2;
+        createWrappedExplosion(center);
+        soundManager.playWrappedBomb();
+        triggerShake("heavy");
+        
+        const toDestroy = new Set([tile1, tile2]);
+        for (let dr = -2; dr <= 2; dr++) {
+            for (let dc = -2; dc <= 2; dc++) {
+                const nr = center.r + dr;
+                const nc = center.c + dc;
+                if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                    if (grid[nr][nc] && !isObstacleId(grid[nr][nc].type.id)) toDestroy.add(grid[nr][nc]);
+                }
+            }
+        }
+        const rect = center.el.getBoundingClientRect();
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+3000 MÉGA DÉTONATION 5x5 ! 🍲💥", "#FFD700");
+        score += 3000;
+        await new Promise(r => setTimeout(r, 280));
+        await processMatches(Array.from(toDestroy));
+        return true;
+    }
+    
+    return false;
+}
+
 async function attemptSwap(tile1, tile2) {
     if (tile1 === tile2) return;
     if (!tile1 || !tile2) return;
     if (isImmovable(tile1) || isImmovable(tile2)) {
         if (selectedTile) {
-            selectedTile.el.classList.remove('selected');
+            selectedTile.el.classList.remove("selected");
             selectedTile = null;
         }
         return;
@@ -2936,36 +4273,54 @@ async function attemptSwap(tile1, tile2) {
     // Check adjacency
     const isAdjacent = Math.abs(tile1.r - tile2.r) + Math.abs(tile1.c - tile2.c) === 1;
     if (!isAdjacent) {
-        // Reset selection if clicked far away
         if (selectedTile) {
-            selectedTile.el.classList.remove('selected');
+            selectedTile.el.classList.remove("selected");
             selectedTile = tile2;
-            tile2.el.classList.add('selected');
+            tile2.el.classList.add("selected");
         }
         return;
     }
     
     isProcessing = true;
     
-    // Visual Swap
-    await swapTilesVisual(tile1, tile2);
-    
-    // Logic Swap
-    swapTilesData(tile1, tile2);
-    
-    // Check Matches
-    const matches = findMatches();
-    
-    if (matches.length > 0) {
-        // Valid move
+    // 1. Check Super-Combo FIRST
+    const superComboHandled = await checkAndExecuteSuperCombo(tile1, tile2);
+    if (superComboHandled) {
         moves--;
         updateUI();
-        await processMatches(matches);
+        if (selectedTile) {
+            selectedTile.el.classList.remove("selected");
+            selectedTile = null;
+        }
+        return;
+    }
+    
+    // 2. Normal Visual Swap
+    await swapTilesVisual(tile1, tile2);
+    swapTilesData(tile1, tile2);
+    
+    // 3. Check Matches with player landing tile passed for special creation
+    const matchResult = findMatches({ r: tile2.r, c: tile2.c });
+    const matchesCount = matchResult.matches ? matchResult.matches.length : (Array.isArray(matchResult) ? matchResult.length : 0);
+    const spawnsCount = matchResult.spawns ? matchResult.spawns.length : 0;
+    
+    if (matchesCount > 0 || spawnsCount > 0) {
+        moves--;
+        updateUI();
+        if (selectedTile) {
+            selectedTile.el.classList.remove("selected");
+            selectedTile = null;
+        }
+        await processMatches(matchResult);
     } else {
-        // Invalid -> Swap back
+        // Invalid move -> Swap back
         await swapTilesVisual(tile1, tile2);
         swapTilesData(tile1, tile2);
         isProcessing = false;
+        if (selectedTile) {
+            selectedTile.el.classList.remove("selected");
+            selectedTile = null;
+        }
     }
 }
 
@@ -2997,7 +4352,7 @@ function swapTilesVisual(t1, t2) {
             t1.el.style.transform = '';
             t2.el.style.transform = '';
             resolve();
-        }, 200);
+        }, 150);
     });
 }
 
@@ -3097,164 +4452,249 @@ function triggerExplosionEffect(startTile, targetTiles) {
     });
 }
 
-function findMatches() {
-    let matches = new Set();
-    let superComboTriggered = false;
-    let chicComboType = null;
-
-    const applyExplosionAroundRun = (run) => {
-        const explosionTargets = [];
-        run.forEach(t => {
-            const positions = [
-                { r: t.r - 1, c: t.c },
-                { r: t.r + 1, c: t.c },
-                { r: t.r, c: t.c - 1 },
-                { r: t.r, c: t.c + 1 }
-            ];
-            positions.forEach(pos => {
-                if (pos.r >= 0 && pos.r < GRID_SIZE && pos.c >= 0 && pos.c < GRID_SIZE) {
-                    const neighbor = grid[pos.r][pos.c];
-                    if (neighbor) {
-                        matches.add(neighbor);
-                        explosionTargets.push(neighbor);
-                    }
-                }
-            });
-        });
-        const center = run[Math.floor(run.length / 2)];
-        triggerExplosionEffect(center, explosionTargets);
-    };
-
-    const applyLineClear = (run, orientation, cross = false) => {
-        if (run.length === 0) return;
-        const center = run[Math.floor(run.length / 2)];
-        const targets = [];
-        
-        if (orientation === 'row' || cross) {
-            for (let c = 0; c < GRID_SIZE; c++) {
-                const t = grid[center.r][c];
-                if (t) {
-                    matches.add(t);
-                    targets.push(t);
-                }
-            }
-        }
-        if (orientation === 'col' || cross) {
-            for (let r = 0; r < GRID_SIZE; r++) {
-                const t = grid[r][center.c];
-                if (t) {
-                    matches.add(t);
-                    targets.push(t);
-                }
-            }
-        }
-        triggerExplosionEffect(center, targets);
-    };
-
-    const checkRun = (run, orientation) => {
-        if (run.length >= 3) {
-            run.forEach(t => matches.add(t));
-            
-            // Standard Match-3 Logic
-            if (run.length === 3 && freeSuperCombos > 0 && !superComboTriggered) {
-                // ... (Super combo logic)
-            }
-            // Special combos
-            if (run.length === 4) {
-                applyLineClear(run, orientation, false);
-            }
-            if (run.length >= 5) {
-                applyLineClear(run, orientation, true); // cross clear
-            }
-        }
-    };
+function findMatches(lastSwapAction = null) {
+    let toDestroy = new Set();
+    let spawns = [];
     
-    // 1. Standard Match-3 (Identical) with Run-Length Check
-    // Horizontal
+    const cellHRun = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+    const cellVRun = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+    const hRuns = [];
+    const vRuns = [];
+    
+    // 1. Horizontal runs
     for (let r = 0; r < GRID_SIZE; r++) {
         let run = [];
         for (let c = 0; c < GRID_SIZE; c++) {
             const t = grid[r][c];
-            // Check if t exists AND if it's not a special obstacle/hole
-            if (!t || isObstacleId(t.type.id)) {
-                checkRun(run, 'row'); run = []; continue;
+            if (!t || isObstacleId(t.type.id) || t.type.id === "color_bomb") {
+                if (run.length >= 3) {
+                    hRuns.push(run);
+                    run.forEach(item => cellHRun[item.r][item.c] = run);
+                }
+                run = [];
+                continue;
             }
-            
-            // If run is empty, start new run
-            if (run.length === 0) {
+            if (run.length === 0 || run[run.length - 1].type.id === t.type.id) {
                 run.push(t);
-            } 
-            // If same type, extend run
-            else if (run[run.length-1].type.id === t.type.id) {
-                run.push(t);
-            } 
-            // If different type, check previous run and start new one
-            else {
-                checkRun(run, 'row'); 
+            } else {
+                if (run.length >= 3) {
+                    hRuns.push(run);
+                    run.forEach(item => cellHRun[item.r][item.c] = run);
+                }
                 run = [t];
             }
         }
-        // End of row check
-        checkRun(run, 'row');
+        if (run.length >= 3) {
+            hRuns.push(run);
+            run.forEach(item => cellHRun[item.r][item.c] = run);
+        }
     }
-
-    // Vertical
+    
+    // 2. Vertical runs
     for (let c = 0; c < GRID_SIZE; c++) {
         let run = [];
         for (let r = 0; r < GRID_SIZE; r++) {
             const t = grid[r][c];
-            if (!t || isObstacleId(t.type.id)) {
-                checkRun(run, 'col'); run = []; continue;
+            if (!t || isObstacleId(t.type.id) || t.type.id === "color_bomb") {
+                if (run.length >= 3) {
+                    vRuns.push(run);
+                    run.forEach(item => cellVRun[item.r][item.c] = run);
+                }
+                run = [];
+                continue;
             }
-            
-            if (run.length === 0) {
+            if (run.length === 0 || run[run.length - 1].type.id === t.type.id) {
                 run.push(t);
-            } 
-            else if (run[run.length-1].type.id === t.type.id) {
-                run.push(t);
-            } 
-            else {
-                checkRun(run, 'col'); 
+            } else {
+                if (run.length >= 3) {
+                    vRuns.push(run);
+                    run.forEach(item => cellVRun[item.r][item.c] = run);
+                }
                 run = [t];
             }
         }
-        checkRun(run, 'col');
+        if (run.length >= 3) {
+            vRuns.push(run);
+            run.forEach(item => cellVRun[item.r][item.c] = run);
+        }
     }
     
-    // 2. Special Recipe Matches (Heterogeneous) — disabled to enforce strict same-type matches
+    if (hRuns.length === 0 && vRuns.length === 0) {
+        return { matches: [], spawns: [] };
+    }
     
-    // 3. Handle Obstacle Destruction (Adjacent to matches)
-    const currentMatches = Array.from(matches);
-    currentMatches.forEach(t => {
-        const neighbors = [
-            {r: t.r-1, c: t.c}, {r: t.r+1, c: t.c},
-            {r: t.r, c: t.c-1}, {r: t.r, c: t.c+1}
-        ];
+    const handledRuns = new Set();
+    const spawnLocations = new Set();
+    
+    // 3. Find L/T/Cross Intersections -> Wrapped Candy (Marmite Royale)
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const h = cellHRun[r][c];
+            const v = cellVRun[r][c];
+            if (h && v && h.length >= 3 && v.length >= 3) {
+                const intersectionTile = grid[r][c];
+                if (intersectionTile && !spawnLocations.has(`${r},${c}`)) {
+                    spawns.push({
+                        r, c,
+                        specialType: "wrapped",
+                        baseType: intersectionTile.type
+                    });
+                    spawnLocations.add(`${r},${c}`);
+                    handledRuns.add(h);
+                    handledRuns.add(v);
+                    h.forEach(t => { if (`${t.r},${t.c}` !== `${r},${c}`) toDestroy.add(t); });
+                    v.forEach(t => { if (`${t.r},${t.c}` !== `${r},${c}`) toDestroy.add(t); });
+                }
+            }
+        }
+    }
+    
+    // 4. Handle remaining runs
+    const allRuns = [...hRuns.map(r => ({ run: r, orientation: "row" })), ...vRuns.map(r => ({ run: r, orientation: "col" }))];
+    allRuns.forEach(({ run, orientation }) => {
+        if (handledRuns.has(run)) return;
+        handledRuns.add(run);
         
+        if (run.length >= 5) {
+            // Line of 5: Color Bomb (Boule Magique d'Attiéké d'Or)
+            let spawnTile = run[Math.floor(run.length / 2)];
+            if (lastSwapAction) {
+                const sw = run.find(t => t.r === lastSwapAction.r && t.c === lastSwapAction.c);
+                if (sw) spawnTile = sw;
+            }
+            spawns.push({
+                r: spawnTile.r,
+                c: spawnTile.c,
+                specialType: "color_bomb",
+                baseType: { id: "color_bomb", name: "Attiéké d'Or Magique", emoji: "🌟" }
+            });
+            spawnLocations.add(`${spawnTile.r},${spawnTile.c}`);
+            run.forEach(t => { if (t !== spawnTile) toDestroy.add(t); });
+        } else if (run.length === 4) {
+            // Line of 4: Striped Candy
+            let spawnTile = run[Math.floor(run.length / 2)];
+            if (lastSwapAction) {
+                const sw = run.find(t => t.r === lastSwapAction.r && t.c === lastSwapAction.c);
+                if (sw) spawnTile = sw;
+            }
+            const stripeType = orientation === "row" ? "striped_v" : "striped_h";
+            spawns.push({
+                r: spawnTile.r,
+                c: spawnTile.c,
+                specialType: stripeType,
+                baseType: spawnTile.type
+            });
+            spawnLocations.add(`${spawnTile.r},${spawnTile.c}`);
+            if (run[0] && run[0].type && run[0].type.id === "poisson") {
+                setTimeout(() => spawnFlyingFish(spawnTile, 3), 350);
+            }
+            run.forEach(t => { if (t !== spawnTile) toDestroy.add(t); });
+        } else {
+            // Match 3
+            run.forEach(t => toDestroy.add(t));
+        }
+    });
+    
+    // 5. Special Tiles Detonation & Chaining
+    const processedSpecials = new Set();
+    let queue = Array.from(toDestroy);
+    
+    while (queue.length > 0) {
+        const t = queue.shift();
+        if (processedSpecials.has(t)) continue;
+        processedSpecials.add(t);
+        
+        if (isStripedTile(t)) {
+            if (t.type.special === "striped_h") {
+                showLaserBeam("row", t.r, 1);
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const rowTile = grid[t.r][c];
+                    if (rowTile && !isObstacleId(rowTile.type.id) && !toDestroy.has(rowTile)) {
+                        toDestroy.add(rowTile);
+                        queue.push(rowTile);
+                    }
+                }
+            } else {
+                showLaserBeam("col", t.c, 1);
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    const colTile = grid[r][t.c];
+                    if (colTile && !isObstacleId(colTile.type.id) && !toDestroy.has(colTile)) {
+                        toDestroy.add(colTile);
+                        queue.push(colTile);
+                    }
+                }
+            }
+            soundManager.playLaserShoot();
+        } else if (isWrappedTile(t)) {
+            createWrappedExplosion(t);
+            soundManager.playWrappedBomb();
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    const nr = t.r + dr;
+                    const nc = t.c + dc;
+                    if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                        const neighbor = grid[nr][nc];
+                        if (neighbor && !toDestroy.has(neighbor)) {
+                            toDestroy.add(neighbor);
+                            queue.push(neighbor);
+                        }
+                    }
+                }
+            }
+        } else if (isColorBombTile(t)) {
+            const ingPool = INGREDIENTS.map(i => i.id);
+            const chosenId = ingPool[Math.floor(Math.random() * ingPool.length)];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cbTarget = grid[r][c];
+                    if (cbTarget && cbTarget.type.id === chosenId && !toDestroy.has(cbTarget)) {
+                        toDestroy.add(cbTarget);
+                        queue.push(cbTarget);
+                    }
+                }
+            }
+        }
+    }
+    
+    // 6. Adjacent Obstacle Destruction
+    toDestroy.forEach(t => {
+        const neighbors = [
+            { r: t.r - 1, c: t.c }, { r: t.r + 1, c: t.c },
+            { r: t.r, c: t.c - 1 }, { r: t.r, c: t.c + 1 }
+        ];
         neighbors.forEach(n => {
             if (n.r >= 0 && n.r < GRID_SIZE && n.c >= 0 && n.c < GRID_SIZE) {
-                const neighborTile = grid[n.r][n.c];
-                if (neighborTile && isObstacleId(neighborTile.type.id) && !matches.has(neighborTile)) {
-                    if (neighborTile.type.id === 'rock') return;
-                    matches.add(neighborTile);
-                    score += 20;
+                const obs = grid[n.r][n.c];
+                if (obs && isObstacleId(obs.type.id) && obs.type.id !== "rock" && !toDestroy.has(obs)) {
+                    if (obs.type.id === "sachet") {
+                        const giftTypes = ["striped_h", "striped_v", "wrapped"];
+                        const giftSpecial = giftTypes[Math.floor(Math.random() * giftTypes.length)];
+                        const giftIng = INGREDIENTS.filter(i => i.id !== "alloco")[Math.floor(Math.random() * 5)];
+                        obs.type = { ...giftIng, special: giftSpecial };
+                        renderTileContent(obs.el, obs.type);
+                        obs.el.classList.add("pop-anim");
+                        const rct = obs.el.getBoundingClientRect();
+                        showFloatingScore(rct.left + rct.width / 2, rct.top - 15, "SACHET OUVERT ! 🛍️🎁", "#00FFFF");
+                        soundManager.playPromoSuccess();
+                        score += 150;
+                    } else {
+                        toDestroy.add(obs);
+                        score += 20;
+                    }
                 }
             }
         });
     });
     
-    if (chicComboType) {
-        for (let r = 0; r < GRID_SIZE; r++) {
-            for (let c = 0; c < GRID_SIZE; c++) {
-                const t = grid[r][c];
-                if (t && !isObstacleId(t.type.id) && t.type.id === chicComboType) {
-                    matches.add(t);
-                }
-            }
-        }
-    }
-
-    return Array.from(matches);
+    // Filter out spawns from toDestroy
+    spawns.forEach(sp => {
+        const spKey = `${sp.r},${sp.c}`;
+        toDestroy.forEach(t => {
+            if (`${t.r},${t.c}` === spKey) toDestroy.delete(t);
+        });
+    });
+    
+    return { matches: Array.from(toDestroy), spawns };
 }
 
 function checkRecipe(tilesArr) {
@@ -3286,7 +4726,7 @@ function causesMatch(r, c, typeId, currentRow) {
 }
 
 function isObstacleId(id) {
-    return id === 'crate' || id === 'frozen' || id === 'rock' || id === 'hole';
+    return id === 'crate' || id === 'frozen' || id === 'rock' || id === 'hole' || id === 'sachet';
 }
 
 function isImmovable(tile) {
@@ -3296,7 +4736,8 @@ function isImmovable(tile) {
 
 function getRandomObstacleForLevel(levelId) {
     const pool = [OBSTACLES.CRATE];
-    if (levelId >= 3) pool.push(OBSTACLES.FIRE);
+    if (levelId >= 2) pool.push(OBSTACLES.SACHET);
+    if (levelId >= 4) pool.push(OBSTACLES.FIRE);
     if (levelId >= 6) pool.push(OBSTACLES.FROZEN);
     if (levelId >= 11) pool.push(OBSTACLES.ROCK);
     const index = Math.floor(Math.random() * pool.length);
@@ -3319,202 +4760,226 @@ function showBonDabali() {
     score += 300;
 }
 
-async function processMatches(matches) {
-    // 1. Logic & Scoring
-    let typeCounts = {};
+async function processMatches(matchResult) {
+    let matches = [];
+    let spawns = [];
     
+    if (Array.isArray(matchResult)) {
+        matches = matchResult;
+    } else if (matchResult && matchResult.matches) {
+        matches = matchResult.matches;
+        spawns = matchResult.spawns || [];
+    }
+    
+    if (matches.length === 0 && spawns.length === 0) return;
+    
+    // 1. Scoring & Goal Progress
+    let typeCounts = {};
     matches.forEach(t => {
-        t.el.classList.add('match-anim');
+        t.el.classList.add("match-anim");
         if (!typeCounts[t.type.id]) typeCounts[t.type.id] = 0;
         typeCounts[t.type.id]++;
         
-        // Particle effect
         const rect = t.el.getBoundingClientRect();
         const color = getParticleColor(t.type.id);
-        spawnMatchParticles(rect.left + rect.width/2, rect.top + rect.height/2, color);
+        spawnMatchParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, color);
     });
-
-    if (matches.length >= 4) {
-        triggerShake();
+    
+    if (matches.length >= 8) {
+        triggerShake("heavy");
+    } else if (matches.length >= 4) {
+        triggerShake("medium");
+    } else {
+        triggerShake("light");
     }
-
+    
     soundManager.playMatch(comboCount || 1);
-    setAvatarMood('angry');
-
+    setAvatarMood("happy");
+    
+    // Floating score pop
+    if (matches.length > 0) {
+        const first = matches[0];
+        const rect = first.el.getBoundingClientRect();
+        const pts = matches.length >= 5 ? 120 : 60;
+        showFloatingScore(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${pts}`);
+        score += pts;
+    }
+    
     if (comboCount > 1) {
-        const bonus = comboCount * 50;
+        const bonus = comboCount * 60;
         score += bonus;
-        showFloatingText(window.innerWidth / 2, window.innerHeight / 2 - 50, `+${bonus}`, '#FFD700');
+        showFloatingScore(window.innerWidth / 2, window.innerHeight / 2 - 40, `+${bonus} COMBO x${comboCount} !`, "#FFD700");
         vibrate([30, 30]);
     }
-
+    
     let goalCompletedThisTurn = false;
-    let allGoalsCompleted = false;
-
-    const levelConfig = LEVELS.find(l => l.id === level) || LEVELS[0];
-
-    // Apply logic per type
     for (let id in typeCounts) {
         const count = typeCounts[id];
-        // 1 Combo = group of 3+. Approx by count/3.
-        const combos = Math.floor(count / 3) || 1; 
-        
-        // Score: 50 per combo ONLY if it is a goal ingredient
-        if (currentGoals[id]) {
-            score += combos * 50;
-        }
-
-        // Goals: +1 per combo
         if (currentGoals[id] && goalProgress[id] < currentGoals[id]) {
             const wasComplete = goalProgress[id] >= currentGoals[id];
-            goalProgress[id] += combos; // Increment by combo count
-            
-            // Cap at max (optional, strictly speaking user said "jusqu'arriver à 10/10")
-            // But if we have 11/10 it's fine visually.
-            
-            const isComplete = goalProgress[id] >= currentGoals[id];
-            if (!wasComplete && isComplete) {
-                goalCompletedThisTurn = true;
-            }
+            // Chaque pièce détruite compte désormais pour +1 dans l'objectif (style Candy Crush)
+            goalProgress[id] += count;
+            if (!wasComplete && goalProgress[id] >= currentGoals[id]) goalCompletedThisTurn = true;
         }
     }
-
-    // Check Global Completion
-    const allMet = Object.keys(currentGoals).every(id => goalProgress[id] >= currentGoals[id]);
     
-    // Trigger Bon Dabali if a goal was just finished OR all are finished
-    if (goalCompletedThisTurn || (allMet && goalCompletedThisTurn)) {
+    const allMet = Object.keys(currentGoals).every(id => goalProgress[id] >= currentGoals[id]);
+    if (goalCompletedThisTurn || allMet) {
         showBonDabali();
     }
-
     updateUI();
-    // setAvatarMood('happy'); // Removed
     
-    await new Promise(r => setTimeout(r, 300));
+    // 2. Transform Spawns into Special Candies in place!
+    spawns.forEach(sp => {
+        const tile = grid[sp.r][sp.c];
+        if (tile) {
+            tile.type = { ...sp.baseType, special: sp.specialType };
+            renderTileContent(tile.el, tile.type);
+            tile.el.classList.add("pop-anim");
+            const rect = tile.el.getBoundingClientRect();
+            const label = sp.specialType === "color_bomb" ? "BOULE MAGIQUE ! 🌟" :
+                          sp.specialType === "wrapped" ? "MARMITE ROYALE ! 🍲" : "INGRÉDIENT RAYÉ ! ⚡";
+            showFloatingScore(rect.left + rect.width / 2, rect.top - 10, label, "#00FFFF");
+            soundManager.playPromoSuccess();
+        }
+    });
     
-    // 2. Simulate Gravity by shifting TYPES down per column (keep DOM nodes for stability)
-    const currentLayout = (LEVELS.find(l => l.id === level) || LEVELS[0]).layout;
+    await new Promise(r => setTimeout(r, 180));
     
-    for (let c = 0; c < GRID_SIZE; c++) {
-        // Collect types that will stay (skip matched tiles and holes)
-        const stayingTypes = [];
-        for (let r = GRID_SIZE - 1; r >= 0; r--) {
-            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
-            const tile = grid[r][c];
-            if (isHole) continue;
-            if (tile && !matches.includes(tile)) {
-                stayingTypes.push(tile.type);
+    // 3. Remove destroyed tiles with full grid cleanup
+    matches.forEach(t => {
+        if (t && t.el && t.el.parentElement) {
+            t.el.remove();
+        }
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                if (grid[r][c] === t) {
+                    grid[r][c] = null;
+                }
             }
         }
-        
-        // Fill from bottom to top
-        let idx = 0;
-        for (let r = GRID_SIZE - 1; r >= 0; r--) {
-            const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
-            if (isHole) continue;
-            
-            const targetTile = grid[r][c];
-            if (!targetTile) continue;
-            
-            if (idx < stayingTypes.length) {
-                targetTile.type = stayingTypes[idx++];
-            } else {
-                // New tile type
-                const newType = INGREDIENTS[Math.floor(Math.random() * INGREDIENTS.length)];
-                targetTile.type = newType;
-            }
-            
-            // Render and animate drop
-            targetTile.el.classList.remove('drop-anim');
-            void targetTile.el.offsetWidth;
-            renderTileContent(targetTile.el, targetTile.type);
-            targetTile.el.classList.add('drop-anim');
-        }
-    }
+    });
     
-    // 3. Check for new matches (Chain reaction)
+    // 4. Physical smooth gravity
+    await applyGravity();
     resolveMatchesLoop();
 }
 
 async function applyGravity() {
     try {
-        // 1. Move tiles down
+        const tileSize = cachedTileSize || 40;
+        const gap = cachedGap || 4;
+        const currentLayout = (LEVELS.find(l => l.id === level) || LEVELS[0]).layout;
+        const newTilesToAnimate = [];
+
+        // 1. Move surviving tiles down per column
         for (let c = 0; c < GRID_SIZE; c++) {
             let emptySlots = 0;
             for (let r = GRID_SIZE - 1; r >= 0; r--) {
-                // Treat 'hole' as a wall: reset emptySlots if we hit a hole
-                if (grid[r][c] && grid[r][c].type.id === 'hole') {
-                    emptySlots = 0; // Reset gravity base
+                const isHole = (currentLayout && currentLayout[r] && currentLayout[r][c] === 0) ||
+                               (grid[r][c] && grid[r][c].type && grid[r][c].type.id === 'hole');
+                if (isHole) {
+                    emptySlots = 0; // Obstacle prevents falling across
                     continue;
                 }
 
                 if (grid[r][c] === null) {
                     emptySlots++;
                 } else if (emptySlots > 0) {
-                    // Move tile down
+                    // Slide tile down smoothly
                     const tile = grid[r][c];
-                    grid[r + emptySlots][c] = tile;
+                    const targetR = r + emptySlots;
+                    grid[targetR][c] = tile;
                     grid[r][c] = null;
-                    tile.r += emptySlots;
+                    tile.r = targetR;
+                    tile.c = c;
                     
-                    // Update Absolute Position
-                    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
-                    const gap = 4;
-                    if(tile.el) {
-                        tile.el.style.top = (tile.r * (tileSize + gap)) + 'px';
-                        tile.el.dataset.r = tile.r;
-                        tile.el.classList.add('drop-anim');
+                    if (tile.el) {
+                        tile.el.dataset.r = targetR;
+                        tile.el.dataset.c = c;
+                        tile.el.style.top = (targetR * (tileSize + gap)) + 'px';
                     }
                 }
             }
             
-            // 2. Fill top with new tiles
-            // We re-scan from top to find remaining nulls
-            for (let r = 0; r < GRID_SIZE; r++) {
-                // If we hit a hole, we skip it (it's not null)
-                // If we hit a null, it means it's empty space above everything else
+            // 2. Spawn and drop new tiles from above the board
+            let spawnIndex = 1;
+            for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                const isHole = (currentLayout && currentLayout[r] && currentLayout[r][c] === 0) ||
+                               (grid[r][c] && grid[r][c].type && grid[r][c].type.id === 'hole');
+                if (isHole) continue;
+
                 if (grid[r][c] === null) {
                     const tileData = createRandomTile(r, c);
                     grid[r][c] = tileData;
+                    
+                    // Position above the board ceiling without triggering reflow
+                    tileData.el.style.top = (-spawnIndex * (tileSize + gap)) + 'px';
+                    tileData.el.style.left = (c * (tileSize + gap)) + 'px';
                     gridEl.appendChild(tileData.el);
                     
-                    const tileSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tile-size')) || 40;
-                    const gap = 4;
-                    
-                    // Set initial absolute position (above grid)
-                    tileData.el.style.position = 'absolute';
-                    tileData.el.style.width = `${tileSize}px`;
-                    tileData.el.style.height = `${tileSize}px`;
-                    tileData.el.style.left = (c * (tileSize + gap)) + 'px';
-                    tileData.el.style.top = (-1 * (tileSize + gap)) + 'px'; // Start above
-                    tileData.el.style.opacity = '1';
-                    
-                    // Force reflow
-                    tileData.el.offsetHeight;
-                    
-                    // Animate to final position
-                    tileData.el.style.top = (r * (tileSize + gap)) + 'px';
-                    tileData.el.classList.add('drop-anim');
-                } else if (grid[r][c].type.id === 'hole') {
-                    // If we hit a hole, we continue. Tiles above holes are valid.
+                    newTilesToAnimate.push({
+                        el: tileData.el,
+                        targetTop: r * (tileSize + gap)
+                    });
+                    spawnIndex++;
                 }
             }
         }
         
-        await new Promise(r => setTimeout(r, 300));
+        // Single requestAnimationFrame: animate all spawned tiles into destination simultaneously!
+        if (newTilesToAnimate.length > 0) {
+            requestAnimationFrame(() => {
+                newTilesToAnimate.forEach(item => {
+                    item.el.style.top = item.targetTop + 'px';
+                });
+            });
+        }
+
+        // Wait for drop transition (160ms for punchy, reactive feel)
+        await new Promise(r => setTimeout(r, 160));
+        
+        // Trigger elastic Squash & Stretch bounce on landed tiles
+        document.querySelectorAll(".tile").forEach(el => {
+            el.classList.remove("tile-land-bounce");
+            void el.offsetWidth;
+            el.classList.add("tile-land-bounce");
+            setTimeout(() => el.classList.remove("tile-land-bounce"), 240);
+        });
+
+        // PASSE DE SÉCURITÉ ABSOLUE : Garantir zéro case vide (null) sur la grille !
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const isHole = currentLayout && currentLayout[r] && currentLayout[r][c] === 0;
+                if (!isHole && grid[r][c] === null) {
+                    const fallbackTile = createRandomTile(r, c);
+                    grid[r][c] = fallbackTile;
+                    fallbackTile.el.style.top = (r * (tileSize + gap)) + "px";
+                    fallbackTile.el.style.left = (c * (tileSize + gap)) + "px";
+                    gridEl.appendChild(fallbackTile.el);
+                    fallbackTile.el.classList.add("pop-anim");
+                }
+            }
+        }
     } catch (e) {
         console.error("Error in applyGravity:", e);
     }
 }
 
 async function resolveMatchesLoop() {
-    const newMatches = findMatches();
-    if (newMatches.length > 0) {
+    const matchResult = findMatches(null);
+    const matchesCount = matchResult.matches ? matchResult.matches.length : (Array.isArray(matchResult) ? matchResult.length : 0);
+    const spawnsCount = matchResult.spawns ? matchResult.spawns.length : 0;
+    
+    if (matchesCount > 0 || spawnsCount > 0) {
         comboCount++;
         if (comboCount > 1) {
             showComboText(comboCount);
         }
-        await processMatches(newMatches);
+        if (comboCount === 4) {
+            triggerCelestialStrike(null, 3);
+        }
+        await processMatches(matchResult);
     } else {
         isProcessing = false;
         comboCount = 0;
@@ -3525,32 +4990,27 @@ async function resolveMatchesLoop() {
 
 function showComboText(count) {
     const el = document.createElement('div');
-    el.innerText = `COMBO x${count} !`;
-    el.style.position = 'fixed';
-    el.style.left = '50%';
-    el.style.top = '40%';
-    el.style.transform = 'translate(-50%, -50%) scale(0) rotate(-10deg)';
-    el.style.color = '#FFD700';
-    el.style.fontSize = '3.5rem';
-    el.style.fontWeight = 'bold';
-    el.style.textShadow = '0 0 15px #FF4500, 4px 4px 0 #8B4513';
-    el.style.zIndex = '2000';
-    el.style.pointerEvents = 'none';
-    el.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-in';
+    el.className = 'combo-banner';
     
+    let phrase = `COMBO x${count} !`;
+    let sub = '';
+    if (count === 2) { phrase = "C'EST DOUX ! 😋"; sub = "Combo x2"; }
+    else if (count === 3) { phrase = "DABALI PROPRE ! 🔥"; sub = "Combo x3"; }
+    else if (count === 4) { phrase = "ÇA MOUSSE FORT ! 💥"; sub = "Super Combo x4"; }
+    else if (count >= 5) { phrase = "CHEF DU GARBADROME ! 👑"; sub = `Méga Combo x${count} !`; }
+
+    el.innerHTML = `
+        <div style="font-size: 1.85rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">${phrase}</div>
+        ${sub ? `<div style="font-size: 1rem; opacity: 0.95; font-weight: 700; margin-top: 3px;">${sub}</div>` : ''}
+    `;
+
     document.body.appendChild(el);
-    
-    requestAnimationFrame(() => {
-        el.style.transform = 'translate(-50%, -50%) scale(1) rotate(0deg)';
-    });
-    
+
     setTimeout(() => {
-        el.style.opacity = '0';
-        el.style.transform = 'translate(-50%, -50%) scale(1.5) rotate(10deg)';
-        setTimeout(() => el.remove(), 300);
-    }, 800);
-    
-    vibrate([50, 50, 50]);
+        el.remove();
+    }, 850);
+
+    vibrate([35, 25, 35]);
 }
 
 function triggerConfetti() {
@@ -3628,7 +5088,6 @@ function showInstallButton() {
 
 
 function checkGameEnd() {
-    // Win Condition
     let allGoalsCompleted = true;
     for (let id in currentGoals) {
         if ((goalProgress[id] || 0) < currentGoals[id]) {
@@ -3641,46 +5100,103 @@ function checkGameEnd() {
 
     if (allGoalsCompleted) {
         clearInterval(timerInterval);
-        setTimeout(() => {
-            showBonDabali(); // Extra celebration
-            triggerConfetti();
-            setTimeout(() => {
-                vibrate([150, 80, 150, 80, 320]);
-                soundManager.playWin();
-                const stars = computeStars(score, levelConfig);
-                saveBestScoreAndStars(level, score, stars);
-                updateModalStars(stars);
-
-                // Reward: +1 combo gratuit si 3 étoiles
-                if (stars === 3) {
-                    freeSuperCombos += 1;
-                    localStorage.setItem(STORAGE_KEYS.freeSuperCombos, String(freeSuperCombos));
-                    updateFreeSuperDisplay();
-                    showFloatingText(window.innerWidth/2, window.innerHeight/2 - 80, '+1 COMBO', '#00FF7F');
+        isProcessing = true;
+        
+        // Célébration Sugar Crush "GARBA CHAUD !"
+        const banner = document.createElement("div");
+        banner.className = "garba-chaud-banner";
+        banner.innerHTML = `GARBA EST CHAUD DÉ ! 🔥<br><span style="font-size:1.15rem; color:#FFF8DC; font-weight:700;">SUGAR CRUSH D'ABIDJAN !</span>`;
+        document.body.appendChild(banner);
+        soundManager.playBonDabali();
+        triggerShake("heavy");
+        
+        setTimeout(async () => {
+            banner.remove();
+            
+            // Convertir chaque coup restant en frappe céleste
+            const remainingMoves = Math.max(0, moves);
+            for (let m = 0; m < remainingMoves; m++) {
+                moves--;
+                updateUI();
+                
+                const pool = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const t = grid[r][c];
+                        if (t && t.type.id !== "hole") pool.push(t);
+                    }
                 }
-
-                const maxUnlocked = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
-                const previousMax = Number.isFinite(maxUnlocked) ? maxUnlocked : 1;
-                const newMax = Math.max(previousMax, level + 1);
-                localStorage.setItem(STORAGE_KEYS.maxUnlockedLevel, String(newMax));
-                document.getElementById('modal-title').innerText = "Niveau Terminé !";
-                document.getElementById('modal-message').innerText = `Bravo ${playerName} ! Score: ${score}`;
-                document.getElementById('modal-btn').innerText = "Niveau Suivant";
-                modalBtn.onclick = () => {
-                    modalOverlay.classList.remove('active');
+                if (pool.length > 0) {
+                    const target = pool[Math.floor(Math.random() * pool.length)];
+                    const rct = target.el.getBoundingClientRect();
+                    const tx = rct.left + rct.width / 2;
+                    const ty = rct.top + rct.height / 2;
+                    
+                    const meteor = document.createElement("div");
+                    meteor.className = "celestial-meteor-fall";
+                    meteor.style.left = `${tx - 4}px`;
+                    meteor.style.top = "0px";
+                    meteor.style.height = `${ty}px`;
+                    document.body.appendChild(meteor);
+                    setTimeout(() => meteor.remove(), 350);
+                    
                     setTimeout(() => {
-                        modalOverlay.classList.add('hidden');
-                        if (shouldShowAdAfterLevel(level, previousMax, newMax)) {
-                            showAdForLevel(level);
-                        } else {
-                            nextLevel();
-                        }
-                    }, 300);
-                };
-                modalOverlay.classList.remove('hidden');
-                modalOverlay.classList.add('active');
-            }, 2000);
-        }, 500);
+                        const imp = document.createElement("div");
+                        imp.className = "celestial-impact-flash";
+                        imp.style.left = `${tx}px`;
+                        imp.style.top = `${ty}px`;
+                        document.body.appendChild(imp);
+                        setTimeout(() => imp.remove(), 350);
+                        
+                        showFloatingScore(tx, ty - 25, "+500 GARBA BONUS ! 🍲⚡", "#FFD700");
+                        soundManager.playThunderImpact();
+                        triggerShake("medium");
+                    }, 100);
+                    
+                    score += 500;
+                    updateUI();
+                }
+                await new Promise(r => setTimeout(r, 220));
+            }
+            
+            triggerConfetti();
+            soundManager.playWin();
+            vibrate([150, 80, 150, 80, 320]);
+            
+            const stars = computeStars(score, levelConfig);
+            saveBestScoreAndStars(level, score, stars);
+            updateModalStars(stars);
+            
+            if (stars === 3) {
+                freeSuperCombos += 1;
+                localStorage.setItem(STORAGE_KEYS.freeSuperCombos, String(freeSuperCombos));
+                updateFreeSuperDisplay();
+                showFloatingScore(window.innerWidth / 2, window.innerHeight / 2 - 80, "+1 COMBO GRATUIT ! 👑", "#00FF7F");
+            }
+            
+            const maxUnlocked = parseInt(localStorage.getItem(STORAGE_KEYS.maxUnlockedLevel), 10);
+            const previousMax = Number.isFinite(maxUnlocked) ? maxUnlocked : 1;
+            const newMax = Math.max(previousMax, level + 1);
+            localStorage.setItem(STORAGE_KEYS.maxUnlockedLevel, String(newMax));
+            
+            document.getElementById("modal-title").innerText = "Garba Réussi ! 👑";
+            document.getElementById("modal-message").innerText = `Bravo ${playerName} ! Score Céleste: ${score}`;
+            document.getElementById("modal-btn").innerText = "Niveau Suivant";
+            modalBtn.onclick = () => {
+                modalOverlay.classList.remove("active");
+                setTimeout(() => {
+                    modalOverlay.classList.add("hidden");
+                    if (shouldShowAdAfterLevel(level, previousMax, newMax)) {
+                        showAdForLevel(level);
+                    } else {
+                        nextLevel();
+                    }
+                }, 300);
+            };
+            modalOverlay.classList.remove("hidden");
+            modalOverlay.classList.add("active");
+            isProcessing = false;
+        }, 1600);
         return;
     }
 
@@ -3841,53 +5357,203 @@ window.addEventListener('online', () => {
     }
 });
 
+function proceedAfterSplash() {
+    if (isMusicOn) {
+        setTimeout(() => ambientSynth.startLoop(), 500);
+    }
+
+    const savedStateRaw = localStorage.getItem(STORAGE_KEYS.gameState);
+    let resumed = false;
+    if (savedStateRaw) {
+        try {
+            const state = JSON.parse(savedStateRaw);
+            if (state.level && state.moves > 0 && state.timeRemaining > 0) {
+                // Show Resume Modal
+                const resumeOverlay = document.createElement('div');
+                resumeOverlay.className = 'modal-overlay active';
+                resumeOverlay.style.zIndex = '3000';
+                resumeOverlay.innerHTML = `
+                    <div class="modal-content" style="background: rgba(20,20,20,0.95); border: 2px solid #FFD700; border-radius: 22px; padding: 24px; text-align: center;">
+                        <h2 style="color:#FFD700; font-size:1.8rem; margin:0 0 10px;">Partie en cours</h2>
+                        <p style="margin:15px 0; font-size:1.1rem; color:#FFF8DC;">Une partie sauvegardée a été trouvée (Niveau ${state.level}).</p>
+                        <p style="margin-bottom:20px; color:#FFE6A7; font-weight:bold;">Score: ${state.score}</p>
+                        <div class="modal-buttons" style="display:flex; gap:15px; justify-content:center;">
+                            <button id="resume-yes-btn" class="modal-btn" style="background:#4CAF50; border:none; padding:10px 22px; border-radius:14px; color:white; font-weight:bold;">Reprendre</button>
+                            <button id="resume-no-btn" class="modal-btn" style="background:#f44336; border:none; padding:10px 22px; border-radius:14px; color:white; font-weight:bold;">Nouvelle Partie</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(resumeOverlay);
+                
+                document.getElementById('resume-yes-btn').onclick = () => {
+                    resumeOverlay.remove();
+                    level = state.level;
+                    startLevel(level, true);
+                };
+                
+                document.getElementById('resume-no-btn').onclick = () => {
+                    resumeOverlay.remove();
+                    clearSavedGame();
+                    openLevelSelect();
+                };
+                resumed = true;
+            }
+        } catch(e) {
+            console.error("Error checking saved state", e);
+        }
+    }
+
+    if (!resumed) {
+        const savedLevel = parseInt(localStorage.getItem(STORAGE_KEYS.currentLevel), 10);
+        const initialLevel = Number.isFinite(savedLevel) && savedLevel >= 1 ? savedLevel : 1;
+        level = initialLevel;
+        openLevelSelect();
+    }
+
+    checkIosPwaPrompt();
+}
+
+function checkIosPwaPrompt() {
+    try {
+        const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+        const isStandalone = ('standalone' in window.navigator && window.navigator.standalone) || 
+                             (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        if (isIos && !isStandalone) {
+            const banner = document.getElementById('ios-pwa-banner');
+            const closeBtn = document.getElementById('close-ios-pwa-btn');
+            if (banner && !sessionStorage.getItem('ios_pwa_dismissed')) {
+                setTimeout(() => {
+                    banner.classList.remove('hidden');
+                }, 3000);
+            }
+            if (closeBtn && banner) {
+                closeBtn.onclick = () => {
+                    banner.classList.add('hidden');
+                    sessionStorage.setItem('ios_pwa_dismissed', 'true');
+                };
+            }
+        }
+    } catch(e) {
+        console.warn("checkIosPwaPrompt error", e);
+    }
+}
+
+// INTRO STARTUP MUSIC (African Drums Tribal)
+let introMusicAudio = null;
+
+function initAndPlayIntroMusic() {
+    if (introMusicAudio) return;
+    try {
+        const savedMusic = localStorage.getItem(STORAGE_KEYS.music);
+        if (savedMusic === 'off') return;
+        
+        introMusicAudio = new Audio('assets/intro_drums.mp3');
+        introMusicAudio.loop = true;
+        introMusicAudio.preload = 'auto';
+        introMusicAudio.volume = Math.max(0.1, Math.min(1.0, musicVolume || 0.7));
+        
+        const playPromise = introMusicAudio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                const unlockIntro = () => {
+                    if (introMusicAudio && splashScreen && splashScreen.style.display !== 'none') {
+                        introMusicAudio.play().catch(() => {});
+                    }
+                    document.removeEventListener('pointerdown', unlockIntro);
+                    document.removeEventListener('touchstart', unlockIntro);
+                };
+                document.addEventListener('pointerdown', unlockIntro, { once: true });
+                document.addEventListener('touchstart', unlockIntro, { once: true });
+            });
+        }
+    } catch(e) {
+        console.warn('Could not initialize intro music:', e);
+    }
+}
+
+function stopIntroMusic() {
+    if (!introMusicAudio) return;
+    try {
+        let currentVol = introMusicAudio.volume;
+        const step = currentVol / 8;
+        const fadeTimer = setInterval(() => {
+            currentVol = Math.max(0, currentVol - step);
+            if (introMusicAudio) introMusicAudio.volume = currentVol;
+            if (currentVol <= 0.02) {
+                clearInterval(fadeTimer);
+                if (introMusicAudio) {
+                    introMusicAudio.pause();
+                    introMusicAudio.currentTime = 0;
+                    introMusicAudio = null;
+                }
+            }
+        }, 30);
+    } catch(e) {
+        try {
+            introMusicAudio.pause();
+            introMusicAudio.currentTime = 0;
+            introMusicAudio = null;
+        } catch(err) {}
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Resume AudioContext on first user interaction to satisfy browser autoplay policies
+    const unlockAudio = () => {
+        if (soundCtx && soundCtx.state === 'suspended') {
+            soundCtx.resume().catch(() => {});
+        }
+    };
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    // Start intro tribal drums music immediately
+    initAndPlayIntroMusic();
+
+    // Start intro video playback smoothly
+    const splashVideo = document.getElementById('splash-video-bg');
+    if (splashVideo) {
+        splashVideo.muted = true;
+        splashVideo.play().catch(() => {});
+    }
+
     // Re-bind Splash elements safely
     splashScreen = document.getElementById('splash-screen');
     startBtn = document.getElementById('start-btn');
-    const progress = document.getElementById('splash-progress');
     
-    // Animate progress
-    if (progress) {
-        setTimeout(() => progress.style.width = '50%', 100);
-        setTimeout(() => progress.style.width = '100%', 500);
-    }
-
     // Show button safely
     if (startBtn) {
-        setTimeout(() => {
-            startBtn.style.display = 'block';
-            startBtn.classList.remove('hidden'); // Legacy
-        }, 100); // Reduced delay for faster startup
+        startBtn.style.display = 'inline-flex';
+        startBtn.classList.remove('hidden');
         
         startBtn.onclick = () => {
+            unlockAudio();
+            stopIntroMusic();
+            ambientSynth.startLoop();
+            if (splashVideo) {
+                try { splashVideo.pause(); } catch(e) {}
+            }
             if (splashScreen) {
                 splashScreen.style.opacity = '0';
                 setTimeout(() => {
                     splashScreen.style.display = 'none';
-                    // Open Name Modal
-                    if (nameModalOverlay) {
-                        nameModalOverlay.classList.remove('hidden');
-                        nameModalOverlay.classList.add('active');
-                        if (playerNameInput) playerNameInput.focus();
+                    const savedName = localStorage.getItem(STORAGE_KEYS.playerName);
+                    if (!savedName || savedName === 'Joueur') {
+                        if (nameModalOverlay) {
+                            nameModalOverlay.classList.remove('hidden');
+                            nameModalOverlay.classList.add('active');
+                            if (playerNameInput) playerNameInput.focus();
+                        }
+                    } else {
+                        playerName = savedName;
+                        proceedAfterSplash();
                     }
-                }, 500);
+                }, 400);
             }
         };
     }
 
-        const boosterItems = document.querySelectorAll('.booster-item');
-        boosterItems.forEach(b => {
-            b.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent grid click
-                const title = b.getAttribute('title');
-                if (title === 'Marteau') activateBooster('hammer');
-                else if (title === 'Mélange') activateBooster('shuffle');
-                else if (title === 'Main') activateBooster('swap');
-            });
-        });
-
-        // Init Game Logic
-        const game = new DabaliGame();
-        game.init();
+    // Init Game Logic
+    const game = new DabaliGame();
+    game.init();
 });

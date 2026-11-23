@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dabali-v36';
+const CACHE_NAME = 'dabali-v40';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -8,6 +8,12 @@ const ASSETS_TO_CACHE = [
     './assets/icone_dabali.png',
     './assets/splash.jpg',
     './assets/maggi.png',
+    './assets/alloco.png',
+    './assets/bottle.png',
+    './assets/map_saga_panoramic.webp',
+    './assets/intro.mp4',
+    './assets/background_game.webp',
+    './assets/background_game.png',
     './assets/icon.svg'
 ];
 
