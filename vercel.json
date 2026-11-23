@@ -4,16 +4,6 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "has": [
-        {
-          "type": "host",
-          "value": "admin.kev-in.site"
-        }
-      ],
-      "source": "/(.*)",
-      "destination": "/admin/$1"
-    },
-    {
       "source": "/admin",
       "destination": "/admin/index.html"
     },
