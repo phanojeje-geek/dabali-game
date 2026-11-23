@@ -1,0 +1,9 @@
+android/
+illustrations/
+node_modules/
+security-reports/
+*.apk
+local.properties
+.DS_Store
+*/.DS_Store
+www/
