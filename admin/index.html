@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dabali Game - Espace Administration 🇨🇮</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="../assets/splash_chef.png">
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-modal" class="login-overlay">
+        <div class="login-card">
+            <div class="login-logo">
+                <span class="logo-emoji">🍲</span>
+                <h1>DABALI ADMIN</h1>
+                <p>Espace de gestion officiel du jeu</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="admin-pin"><i class="fas fa-lock"></i> Clé d'accès administrateur</label>
+                    <input type="password" id="admin-pin" placeholder="Entrez la clé secrète..." required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="login-error hidden">Clé incorrecte. Veuillez réessayer.</div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <span>Accéder au Dashboard</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <div class="login-hint">Clé par défaut : <code>dabali2026admin</code></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div id="dashboard-app" class="dashboard-layout hidden">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <span class="brand-badge">🇨🇮 ADMIN</span>
+                    <h2>Dabali Game</h2>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="tab-overview">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Vue d'ensemble</span>
+                </button>
+                <button class="nav-item" data-tab="tab-sponsors">
+                    <i class="fas fa-bullhorn"></i>
+                    <span>Sponsors & Pubs</span>
+                </button>
+                <button class="nav-item" data-tab="tab-levels">
+                    <i class="fas fa-cubes"></i>
+                    <span>Gestion des Niveaux</span>
+                </button>
+                <button class="nav-item" data-tab="tab-announcements">
+                    <i class="fas fa-broadcast-tower"></i>
+                    <span>Annonces Flash</span>
+                </button>
+                <button class="nav-item" data-tab="tab-settings">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>Paramètres & Clé</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="https://jeux.kev-in.site" target="_blank" class="btn btn-outline btn-sm btn-block">
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Ouvrir le Jeu en Ligne</span>
+                </a>
+                <button id="logout-btn" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Navbar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h2 id="page-title">Vue d'ensemble</h2>
+                    <span class="status-indicator live">
+                        <span class="dot"></span> En direct sur <strong>jeux.kev-in.site</strong>
+                    </span>
+                </div>
+                <div class="topbar-right">
+                    <button id="sync-now-btn" class="btn btn-success">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Publier les changements</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Notifications Toast Container -->
+            <div id="toast-container" class="toast-container"></div>
+
+            <!-- Tab 1: Overview -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-gold"><i class="fas fa-map-marked-alt"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Niveaux Disponibles</span>
+                            <h3 id="stat-levels-count">30</h3>
+                            <span class="stat-sub">Saga d'Abidjan active</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i class="fas fa-ad"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Campagnes Partenaires</span>
+                            <h3 id="stat-ads-count">1</h3>
+                            <span class="stat-sub">Prêtes à être diffusées</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-orange"><i class="fas fa-bullhorn"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Annonce Joueur</span>
+                            <h3 id="stat-announcement-status">Active</h3>
+                            <span class="stat-sub">Affichée au lancement</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i class="fas fa-shield-alt"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Statut Serveur</span>
+                            <h3>Opérationnel</h3>
+                            <span class="stat-sub">API Vercel 200 OK</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2-cols">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-bolt"></i> Actions Rapides</h3>
+                        </div>
+                        <div class="card-body action-buttons">
+                            <button class="quick-action-btn" onclick="switchTab('tab-sponsors')">
+                                <i class="fas fa-plus-circle text-gold"></i>
+                                <span>Ajouter un Sponsor Publicitaire</span>
+                            </button>
+                            <button class="quick-action-btn" onclick="switchTab('tab-levels')">
+                                <i class="fas fa-layer-group text-green"></i>
+                                <span>Créer un Nouveau Niveau (31+)</span>
+                            </button>
+                            <button class="quick-action-btn" onclick="switchTab('tab-announcements')">
+                                <i class="fas fa-bell text-orange"></i>
+                                <span>Modifier l'Annonce du Jeu</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-info-circle"></i> Guide d'Utilisation</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="guide-text">
+                                Bienvenue sur le back-office de <strong>Dabali Game</strong>. Toutes les modifications enregistrées ici sont transmises directement aux joueurs via l'API, sans qu'ils aient besoin de réinstaller l'APK Android ou la PWA iPhone.
+                            </p>
+                            <ul class="guide-list">
+                                <li><strong>Publicités :</strong> Configure des redirections directes vers WhatsApp ou le site du sponsor.</li>
+                                <li><strong>Niveaux :</strong> Règle la difficulté, les quartiers et les ingrédients à récolter.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 2: Sponsors & Ads -->
+            <section id="tab-sponsors" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h3>Régie Publicitaire & Partenariats Sponsors</h3>
+                        <p>Affiche une pop-up sponsorisée tous les 2, 3 ou 5 niveaux gagnés avec un bouton cliquable vers leur WhatsApp ou site web.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAdModal()">
+                        <i class="fas fa-plus"></i> Nouveau Partenaire
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Partenaire</th>
+                                        <th>Message & Code</th>
+                                        <th>Lien de Redirection</th>
+                                        <th>Fréquence</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ads-table-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Ad Simulator Card -->
+                <div class="card mt-20">
+                    <div class="card-header">
+                        <h3><i class="fas fa-mobile-alt"></i> Aperçu Simulateur : Ce que le joueur verra en jeu</h3>
+                    </div>
+                    <div class="card-body flex-center">
+                        <div class="ad-preview-box">
+                            <div class="ad-preview-header">
+                                <span class="ad-sponsor-badge">PARTENAIRE OFFICIEL</span>
+                                <h4 id="preview-ad-partner">Garba Palace Abidjan</h4>
+                            </div>
+                            <div class="ad-preview-content">
+                                <p id="preview-ad-text">Le meilleur Garba chaud de Cocody ! Commandez direct sur WhatsApp avec -15%</p>
+                                <div class="ad-preview-code">Code : <strong id="preview-ad-code">GARBA15</strong></div>
+                            </div>
+                            <div class="ad-preview-actions">
+                                <a id="preview-ad-link" href="#" target="_blank" class="btn btn-whatsapp">
+                                    <i class="fab fa-whatsapp"></i> Visiter le Partenaire
+                                </a>
+                                <button class="btn btn-secondary btn-sm" disabled>Continuer le jeu (3s)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 3: Levels Manager -->
+            <section id="tab-levels" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h3>Gestionnaire des Niveaux</h3>
+                        <p>Configure les objectifs, coups, et quartiers d'Abidjan pour chaque niveau.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openLevelModal()">
+                        <i class="fas fa-plus"></i> Créer un Nouveau Niveau
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Niveau</th>
+                                        <th>Quartier (Abidjan)</th>
+                                        <th>Coups</th>
+                                        <th>Objectifs</th>
+                                        <th>Obstacles</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="levels-table-body">
+                                    <!-- Dynamic Levels List -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 4: Flash Announcements -->
+            <section id="tab-announcements" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h3>Annonces & Notifications Flash</h3>
+                        <p>Message défilant ou pop-up affiché sur l'écran d'accueil du jeu pour les événements, défis et tournois.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <form id="announcement-form">
+                            <div class="form-group toggle-group">
+                                <label for="announcement-toggle">Activer l'annonce en jeu</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="announcement-toggle" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="announcement-badge">Étiquette / Type</label>
+                                <input type="text" id="announcement-badge" value="Événement" placeholder="Ex: Événement, Promo, Tournoi">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="announcement-text">Message de l'annonce</label>
+                                <textarea id="announcement-text" rows="3" placeholder="Écrivez le message que tous les joueurs verront..."></textarea>
+                            </div>
+
+                            <button type="button" class="btn btn-success" onclick="saveAnnouncement()">
+                                <i class="fas fa-save"></i> Enregistrer l'annonce
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 5: Settings -->
+            <section id="tab-settings" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h3>Paramètres de Sécurité & Synchronisation</h3>
+                        <p>Configure la clé d'administration et teste la connexion API.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <form id="settings-form">
+                            <div class="form-group">
+                                <label for="settings-key">Clé secrète Administrateur</label>
+                                <input type="password" id="settings-key" value="dabali2026admin">
+                                <small>Cette clé protège l'accès à ce dashboard et autorise les mises à jour.</small>
+                            </div>
+                            <div class="form-group">
+                                <label>URL de l'API de Synchronisation</label>
+                                <input type="text" id="api-url-input" value="/api/game-config" readonly>
+                            </div>
+                            <div class="buttons-row">
+                                <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                                    <i class="fas fa-key"></i> Mettre à jour la clé
+                                </button>
+                                <button type="button" class="btn btn-outline" onclick="testApiConnection()">
+                                    <i class="fas fa-network-wired"></i> Tester la connexion API
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Form: Add / Edit Sponsor Ad -->
+    <div id="ad-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="ad-modal-title">Nouveau Partenaire Publicitaire</h3>
+                <button type="button" class="close-btn" onclick="closeAdModal()">&times;</button>
+            </div>
+            <form id="ad-form" onsubmit="handleAdSubmit(event)">
+                <input type="hidden" id="ad-id">
+                <div class="form-group">
+                    <label for="ad-partner">Nom du Partenaire *</label>
+                    <input type="text" id="ad-partner" placeholder="Ex: Restaurant Garba Palace" required>
+                </div>
+                <div class="form-group">
+                    <label for="ad-text">Texte Publicitaire *</label>
+                    <textarea id="ad-text" rows="2" placeholder="Ex: Commandez votre garba en ligne avec -15% de réduction !" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="ad-link">Lien de Redirection (WhatsApp ou Site) *</label>
+                    <input type="url" id="ad-link" placeholder="Ex: https://wa.me/2250707070707 ou https://monsite.com" required>
+                    <small>Astuce : utilise un lien WhatsApp direct <code>https://wa.me/225XXXXXXXX</code> pour recevoir les commandes directes !</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="ad-code">Code Promo (Optionnel)</label>
+                        <input type="text" id="ad-code" placeholder="Ex: DABALI20">
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="ad-frequency">Fréquence d'apparition</label>
+                        <select id="ad-frequency">
+                            <option value="2">Tous les 2 niveaux</option>
+                            <option value="3" selected>Tous les 3 niveaux</option>
+                            <option value="4">Tous les 4 niveaux</option>
+                            <option value="5">Tous les 5 niveaux</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group toggle-group">
+                    <label for="ad-enabled">Activer la campagne publicitaire</label>
+                    <label class="switch">
+                        <input type="checkbox" id="ad-enabled" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAdModal()">Annuler</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Form: Add / Edit Level -->
+    <div id="level-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="level-modal-title">Créer un Nouveau Niveau</h3>
+                <button type="button" class="close-btn" onclick="closeLevelModal()">&times;</button>
+            </div>
+            <form id="level-form" onsubmit="handleLevelSubmit(event)">
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="level-number">Numéro du Niveau *</label>
+                        <input type="number" id="level-number" min="1" max="100" value="31" required>
+                    </div>
+                    <div class="form-group col-6">
+                        <label for="level-moves">Nombre de Coups *</label>
+                        <input type="number" id="level-moves" min="10" max="60" value="25" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="level-name">Nom du Quartier / Lieu (Abidjan) *</label>
+                    <input type="text" id="level-name" placeholder="Ex: Koumassi Remblais, Bassam Plage, Yopougon..." required>
+                </div>
+
+                <div class="form-group">
+                    <label>Objectifs à récolter</label>
+                    <div class="goals-selection-grid">
+                        <div class="goal-input-item">
+                            <span>🍚 Attiéké</span>
+                            <input type="number" id="goal-attieke" min="0" max="50" value="15">
+                        </div>
+                        <div class="goal-input-item">
+                            <span>🐟 Poisson</span>
+                            <input type="number" id="goal-poisson" min="0" max="50" value="15">
+                        </div>
+                        <div class="goal-input-item">
+                            <span>🌶️ Piment</span>
+                            <input type="number" id="goal-piment" min="0" max="50" value="10">
+                        </div>
+                        <div class="goal-input-item">
+                            <span>🧅 Oignon</span>
+                            <input type="number" id="goal-oignon" min="0" max="50" value="10">
+                        </div>
+                        <div class="goal-input-item">
+                            <span>🍾 Boisson</span>
+                            <input type="number" id="goal-huile" min="0" max="50" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="level-obstacles">Obstacles présents</label>
+                    <select id="level-obstacles">
+                        <option value="none">Aucun obstacle (Facile)</option>
+                        <option value="sachet">Sachets de Garba (Moyen)</option>
+                        <option value="caisse">Caisses Dabali (Avancé)</option>
+                        <option value="both">Sachets + Caisses (Expert)</option>
+                    </select>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeLevelModal()">Annuler</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Enregistrer le niveau</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

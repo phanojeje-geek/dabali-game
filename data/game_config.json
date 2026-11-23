@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-11-23T03:20:00Z",
+  "announcement": {
+    "enabled": true,
+    "text": "Bienvenue sur Dabali Game ! Nouveau tournoi du Garbaman ouvert à Abidjan !",
+    "badge": "Événement"
+  },
+  "ads": [
+    {
+      "id": "ad-1",
+      "partner": "Garba Palace Abidjan",
+      "text": "Le meilleur Garba chaud de Cocody ! Commandez direct sur WhatsApp avec -15%",
+      "code": "GARBA15",
+      "link": "https://wa.me/2250707070707",
+      "bannerUrl": "assets/splash_chef.png",
+      "frequency": 3,
+      "enabled": true
+    }
+  ],
+  "customLevels": []
+}

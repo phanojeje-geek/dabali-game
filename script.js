@@ -2143,42 +2143,101 @@ function spawnComboStars() {
     }, 800);
 }
 
+// Configuration dynamique en ligne (gérée depuis le Dashboard Admin)
+window.gameConfig = {
+    ads: [],
+    customLevels: [],
+    announcement: null
+};
+
+async function fetchDynamicGameConfig() {
+    try {
+        const res = await fetch('/api/game-config');
+        if (res.ok) {
+            const data = await res.json();
+            if (data) {
+                window.gameConfig = data;
+                applyDynamicConfig(data);
+            }
+        }
+    } catch(e) {
+        console.log("Mode hors-ligne ou config par défaut");
+    }
+}
+
+function applyDynamicConfig(config) {
+    if (config.customLevels && Array.isArray(config.customLevels)) {
+        config.customLevels.forEach(customLvl => {
+            const existingIdx = LEVELS.findIndex(l => l.id === customLvl.id);
+            if (existingIdx >= 0) {
+                LEVELS[existingIdx] = { ...LEVELS[existingIdx], ...customLvl };
+            } else {
+                LEVELS.push(customLvl);
+            }
+        });
+    }
+
+    if (config.announcement && config.announcement.enabled && config.announcement.text) {
+        showAnnouncementBanner(config.announcement);
+    }
+}
+
+function showAnnouncementBanner(announcement) {
+    if (document.getElementById('flash-announcement-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'flash-announcement-banner';
+    banner.style.cssText = "position:fixed; top:15px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(180, 83, 9, 0.95)); border:1.5px solid #FFD700; border-radius:20px; padding:8px 18px; color:#FFF; font-size:0.85rem; font-weight:700; z-index:99999; display:flex; align-items:center; gap:10px; box-shadow:0 10px 25px rgba(0,0,0,0.4); max-width:90%;";
+    banner.innerHTML = `
+        <span style="background:#FFF; color:#B45309; padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:800;">${announcement.badge || 'INFO'}</span>
+        <span>${announcement.text}</span>
+        <button style="background:transparent; border:none; color:#FFF; font-size:1.1rem; cursor:pointer; padding:0 4px;" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    document.body.appendChild(banner);
+    setTimeout(() => {
+        if (banner.parentElement) {
+            banner.style.opacity = '0';
+            banner.style.transition = 'opacity 0.5s';
+            setTimeout(() => banner.remove(), 500);
+        }
+    }, 8000);
+}
+
 function shouldShowAdAfterLevel(completedLevel, previousMax, newMax) {
-    // Désactivé temporairement tant qu'aucun partenariat commercial officiel n'est actif
-    return false;
+    if (!window.gameConfig || !window.gameConfig.ads) return false;
+    const activeAds = window.gameConfig.ads.filter(a => a.enabled);
+    if (activeAds.length === 0) return false;
+    
+    // Fréquence configurée dans l'admin (par défaut tous les 3 niveaux)
+    const freq = activeAds[0].frequency || 3;
+    return completedLevel > 0 && completedLevel % freq === 0;
 }
 
 function showAdForLevel(completedLevel) {
-    // Mode sans sponsor : passage direct au niveau suivant
-    nextLevel();
-    return;
-    if (!adModalOverlay || !adPartnerNameEl || !adCodeHintEl || !adCountdownEl || !adContinueBtn) {
+    if (!window.gameConfig || !window.gameConfig.ads) {
         nextLevel();
         return;
     }
-    const fakeAds = [
-        { partner: 'Garba Palace', code: 'GARBA2025', text: 'Code GARBA2025 pour débloquer des niveaux.' },
-        { partner: 'Dabali Street', code: 'DABALI50', text: 'Code DABALI50 pour avancer plus vite.' },
-        { partner: 'Super Sauce Piment', code: 'SUPERDABALI', text: 'Code SUPERDABALI pour des super combos.' }
-    ];
-    const ad = fakeAds[Math.floor(Math.random() * fakeAds.length)];
+    const activeAds = window.gameConfig.ads.filter(a => a.enabled);
+    if (activeAds.length === 0 || !adModalOverlay || !adPartnerNameEl || !adCodeHintEl || !adCountdownEl || !adContinueBtn) {
+        nextLevel();
+        return;
+    }
+
+    const ad = activeAds[Math.floor(Math.random() * activeAds.length)];
     adPartnerNameEl.innerText = `${ad.partner}`;
-    adCodeHintEl.innerText = `Retient bien le code : ${ad.code}`;
-    let remaining = 10;
+    adCodeHintEl.innerHTML = `
+        <div style="font-size:0.95rem; margin-bottom:10px; color:#FFF8DC; line-height:1.4;">${ad.text}</div>
+        ${ad.code ? `<div style="color:#FFD700; font-weight:bold; margin-bottom:12px;">Code Promo : <strong style="font-size:1.1rem;">${ad.code}</strong></div>` : ''}
+        ${ad.link ? `<a href="${ad.link}" target="_blank" class="modal-btn" style="background:#25D366; color:#FFF; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 18px; border-radius:14px; margin-bottom:12px; font-weight:bold; box-shadow:0 4px 12px rgba(37,211,102,0.4);"><i class="fab fa-whatsapp"></i> Visiter le Partenaire</a>` : ''}
+    `;
+
+    let remaining = 6;
     adCountdownEl.innerText = String(remaining);
     adContinueBtn.disabled = true;
     soundManager.playAdStart();
     vibrate([60, 40, 60]);
     adModalOverlay.classList.remove('hidden');
     adModalOverlay.classList.add('active');
-    let lastCode = ad.code;
-    if (adCopyBtn) {
-        adCopyBtn.onclick = () => {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(lastCode);
-            }
-        };
-    }
 
     const interval = setInterval(() => {
         remaining -= 1;
@@ -2186,14 +2245,11 @@ function showAdForLevel(completedLevel) {
         if (remaining <= 0) {
             clearInterval(interval);
             adContinueBtn.disabled = false;
-            setTimeout(() => {
-                if (!adModalOverlay.classList.contains('hidden')) {
-                    adContinueBtn.onclick();
-                }
-            }, 3000);
         }
     }, 1000);
+
     adContinueBtn.onclick = () => {
+        clearInterval(interval);
         adModalOverlay.classList.remove('active');
         setTimeout(() => {
             adModalOverlay.classList.add('hidden');
@@ -2280,6 +2336,7 @@ function updateTileSize() {
 // INIT
 function initGame() {
     console.log("Dabali Game v1.11 - Init Started");
+    fetchDynamicGameConfig();
     
     // 1. Assign DOM Elements
     gridEl = document.getElementById('grid');

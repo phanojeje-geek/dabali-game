@@ -4,7 +4,7 @@
   "description": "DABALI - Jeu Match-3 Ivoirien",
   "main": "index.html",
   "scripts": {
-    "build": "rm -rf www && mkdir -p www/assets && cp index.html style.css script.js manifest.json sw.js www/ && cp -r assets/* www/assets/",
+    "build": "rm -rf www && mkdir -p www/assets && cp index.html style.css script.js manifest.json sw.js www/ && cp -r assets/* www/assets/ && cp -r admin www/ && cp -r data www/",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:build": "npm run cap:sync && cd android && ./gradlew assembleDebug",
     "cap:open": "npx cap open android"
