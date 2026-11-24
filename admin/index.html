@@ -70,6 +70,10 @@
                     <i class="fas fa-broadcast-tower"></i>
                     <span>Annonces Flash</span>
                 </button>
+                <button class="nav-item" data-tab="tab-feedbacks">
+                    <i class="fas fa-star text-gold"></i>
+                    <span>Avis &amp; Stats Live</span>
+                </button>
                 <button class="nav-item" data-tab="tab-settings">
                     <i class="fas fa-sliders-h"></i>
                     <span>Paramètres & Clé</span>
@@ -141,6 +145,22 @@
                             <span class="stat-label">Statut Serveur</span>
                             <h3>Opérationnel</h3>
                             <span class="stat-sub">API Vercel 200 OK</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i class="fas fa-users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Joueurs en Direct</span>
+                            <h3 id="stat-online-players"><span class="pulse-dot"></span> 1</h3>
+                            <span class="stat-sub">Connectés en temps réel</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-gold"><i class="fas fa-star"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Note &amp; Avis</span>
+                            <h3 id="stat-avg-rating">5.0 ⭐</h3>
+                            <span class="stat-sub" id="stat-feedback-summary">Retours enregistrés</span>
                         </div>
                     </div>
                 </div>
@@ -349,6 +369,166 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Tab 6: Feedbacks & Live Stats -->
+            <section id="tab-feedbacks" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <h3>Avis des Joueurs &amp; Statistiques en Direct</h3>
+                        <p>Surveillez les joueurs actifs en temps réel et analysez les notes, idées et signalements.</p>
+                    </div>
+                    <div class="header-actions">
+                        <span class="live-pulse-badge"><span class="pulse-dot"></span> Actualisation auto 30s</span>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="fetchLiveStats(true)">
+                            <i class="fas fa-sync-alt"></i> Actualiser
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Metrics Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-green"><i class="fas fa-satellite-dish"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Joueurs en Direct</span>
+                            <h3 id="fb-online-count"><span class="pulse-dot"></span> 1</h3>
+                            <span class="stat-sub">Session active < 3 min</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-gold"><i class="fas fa-star"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Note Moyenne</span>
+                            <h3 id="fb-avg-rating">5.0 ⭐</h3>
+                            <span class="stat-sub" id="fb-rating-count">Basé sur 2 avis</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i class="fas fa-lightbulb"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Suggestions Reçues</span>
+                            <h3 id="fb-suggestions-count">1</h3>
+                            <span class="stat-sub">Idées pour la saga</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-orange"><i class="fas fa-bug"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Bugs Signalés</span>
+                            <h3 id="fb-bugs-count">0</h3>
+                            <span class="stat-sub">À surveiller / corriger</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supabase Cloud Connection Box -->
+                <div class="card mb-20">
+                    <div class="card-header flex-between">
+                        <h3><i class="fas fa-database text-gold"></i> Intégration Supabase Cloud</h3>
+                        <span class="badge" id="supabase-status-badge">Prêt / Mode Hybride</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="supabase-info-grid">
+                            <div class="supabase-field">
+                                <label>Projet Supabase :</label>
+                                <strong>owiwogingjiumfiyawbk (Paris - eu-west-3)</strong>
+                            </div>
+                            <div class="supabase-field">
+                                <label>URL REST :</label>
+                                <code>https://owiwogingjiumfiyawbk.supabase.co</code>
+                            </div>
+                        </div>
+
+                        <div class="form-row mt-15">
+                            <div class="form-group col-8">
+                                <label for="supabase-anon-key-input">Clé Publique Supabase (anon / public) :</label>
+                                <input type="password" id="supabase-anon-key-input" placeholder="Collez votre clé 'anon' trouvée dans l'onglet Framework de Supabase...">
+                                <small>Trouvez-la en 1 clic dans Supabase &gt; Connect &gt; Framework.</small>
+                            </div>
+                            <div class="form-group col-4 flex-align-end">
+                                <button type="button" class="btn btn-primary btn-block" onclick="saveSupabaseAnonKey()">
+                                    <i class="fas fa-save"></i> Enregistrer la clé
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="buttons-row mt-10">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="testSupabaseConnection()">
+                                <i class="fas fa-plug"></i> Tester l'API Supabase
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleSqlModal()">
+                                <i class="fas fa-code"></i> Afficher le script SQL de la table feedbacks
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Active Sessions Table -->
+                <div class="card mb-20">
+                    <div class="card-header flex-between">
+                        <h3><i class="fas fa-users text-green"></i> Joueurs Actuellement Connectés</h3>
+                        <span class="badge badge-green" id="live-players-badge">1 joueur actif</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Statut</th>
+                                        <th>Joueur</th>
+                                        <th>Niveau Actuel</th>
+                                        <th>Temps de jeu</th>
+                                        <th>Dernier signe</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="live-players-tbody">
+                                    <tr>
+                                        <td><span class="status-badge online"><span class="pulse-dot"></span> En jeu</span></td>
+                                        <td><strong>Kouassi le Gourmet</strong></td>
+                                        <td>Niveau 4 (Palmeraie)</td>
+                                        <td>5 min</td>
+                                        <td>Il y a 10s</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feedbacks & Reviews Table -->
+                <div class="card">
+                    <div class="card-header flex-between">
+                        <h3><i class="fas fa-comments text-gold"></i> Liste des Retours &amp; Avis</h3>
+                        <div class="feedback-filters">
+                            <button type="button" class="filter-chip active" data-fb-filter="all">Tous (<span id="count-all">0</span>)</button>
+                            <button type="button" class="filter-chip" data-fb-filter="avis">⭐ Avis (<span id="count-avis">0</span>)</button>
+                            <button type="button" class="filter-chip" data-fb-filter="suggestion">💡 Idées (<span id="count-suggestion">0</span>)</button>
+                            <button type="button" class="filter-chip" data-fb-filter="bug">🐛 Bugs (<span id="count-bug">0</span>)</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Joueur</th>
+                                        <th>Niveau</th>
+                                        <th>Note</th>
+                                        <th>Catégorie</th>
+                                        <th>Message</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="feedbacks-tbody">
+                                    <!-- Rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -468,6 +648,57 @@
                     <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Enregistrer le niveau</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Supabase SQL Script -->
+    <div id="sql-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-lg" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-database text-gold"></i> Script SQL Supabase (Table feedbacks)</h3>
+                <button type="button" class="close-btn" onclick="toggleSqlModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 12px; color: var(--text-secondary); font-size: 0.95rem;">
+                    Pour créer directement la table dans votre projet Supabase, ouvrez le <strong>SQL Editor</strong> de Supabase et exécutez ce script :
+                </p>
+                <div style="position: relative;">
+                    <pre style="background: #080C14; border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; font-size: 0.82rem; color: #38BDF8; overflow-x: auto; max-height: 260px;" id="sql-code-block"><code>-- Création de la table feedbacks pour Dabali Game
+CREATE TABLE IF NOT EXISTS public.feedbacks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    player_name TEXT NOT NULL DEFAULT 'Joueur',
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    category TEXT NOT NULL CHECK (category IN ('avis', 'suggestion', 'bug')),
+    message TEXT NOT NULL,
+    level INTEGER DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'nouveau',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Activation de la sécurité Row Level Security (RLS)
+ALTER TABLE public.feedbacks ENABLE ROW LEVEL SECURITY;
+
+-- Autoriser tout joueur à soumettre un avis (INSERT public)
+CREATE POLICY "Public insert feedbacks" ON public.feedbacks
+    FOR INSERT TO anon, authenticated
+    WITH CHECK (true);
+
+-- Autoriser la lecture des avis (SELECT)
+CREATE POLICY "Public select feedbacks" ON public.feedbacks
+    FOR SELECT TO anon, authenticated
+    USING (true);
+
+-- Autoriser la mise à jour (UPDATE status)
+CREATE POLICY "Public update feedbacks" ON public.feedbacks
+    FOR UPDATE TO anon, authenticated
+    USING (true);
+</code></pre>
+                </div>
+                <div class="modal-footer" style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="toggleSqlModal()">Fermer</button>
+                    <button type="button" class="btn btn-success" onclick="copySqlCode()"><i class="fas fa-copy"></i> Copier le Script SQL</button>
+                </div>
+            </div>
         </div>
     </div>
 

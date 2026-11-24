@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     loadConfig();
     setupSimulatorLiveSync();
+    initFeedbacksTab();
 });
 
 // AUTHENTICATION
@@ -146,6 +147,7 @@ function switchTab(tabId) {
         'tab-sponsors': "Régie Publicitaire & Sponsors",
         'tab-levels': "Gestionnaire des Niveaux",
         'tab-announcements': "Annonces & Notifications",
+        'tab-feedbacks': "Avis des Joueurs & Stats Live",
         'tab-settings': "Paramètres & Clé"
     };
     document.getElementById('page-title').innerText = titles[tabId] || "Administration";
@@ -556,4 +558,307 @@ function escapeHtml(str) {
         "'": '&#39;',
         '"': '&quot;'
     }[tag] || tag));
+}
+
+/* ==========================================================================
+   FEEDBACKS & LIVE PLAYER STATS CONTROLLER
+   ========================================================================== */
+let allFeedbacks = [];
+let currentFbFilter = 'all';
+
+function initFeedbacksTab() {
+    // Restore saved Supabase anon key
+    const savedKey = localStorage.getItem('dabali_supabase_anon_key');
+    const keyInput = document.getElementById('supabase-anon-key-input');
+    if (savedKey && keyInput) {
+        keyInput.value = savedKey;
+        const badge = document.getElementById('supabase-status-badge');
+        if (badge) {
+            badge.className = 'badge badge-green';
+            badge.textContent = 'Clé Supabase Configurée ✅';
+        }
+    }
+
+    // Setup filter chips
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentFbFilter = chip.getAttribute('data-fb-filter') || 'all';
+            renderFeedbacks();
+        });
+    });
+
+    // Initial fetch and 30s auto-refresh
+    fetchLiveStats();
+    setInterval(fetchLiveStats, 30000);
+}
+
+async function fetchLiveStats(manual = false) {
+    const supabaseKey = localStorage.getItem('dabali_supabase_anon_key') || '';
+    const headers = {};
+    if (supabaseKey) headers['X-Supabase-Key'] = supabaseKey;
+
+    try {
+        // 1. Fetch live heartbeat & active sessions
+        const hbRes = await fetch('/api/heartbeat');
+        if (hbRes.ok) {
+            const hbData = await hbRes.json();
+            const count = hbData.onlineCount || 1;
+            
+            const overviewCountEl = document.getElementById('stat-online-players');
+            if (overviewCountEl) overviewCountEl.innerHTML = `<span class="pulse-dot"></span> ${count}`;
+
+            const fbCountEl = document.getElementById('fb-online-count');
+            if (fbCountEl) fbCountEl.innerHTML = `<span class="pulse-dot"></span> ${count}`;
+
+            const badge = document.getElementById('live-players-badge');
+            if (badge) badge.textContent = `${count} joueur${count > 1 ? 's' : ''} en direct`;
+
+            renderLiveSessions(hbData.sessions || []);
+        }
+
+        // 2. Fetch feedbacks and overall metrics
+        const fbRes = await fetch('/api/feedback', { headers });
+        if (fbRes.ok) {
+            const data = await fbRes.json();
+            allFeedbacks = data.feedbacks || [];
+
+            // Update counters
+            const total = allFeedbacks.length;
+            const avg = total > 0
+                ? (allFeedbacks.reduce((s, f) => s + (parseInt(f.rating) || 5), 0) / total).toFixed(1)
+                : "5.0";
+
+            const countAvis = allFeedbacks.filter(f => f.category === 'avis').length;
+            const countSug = allFeedbacks.filter(f => f.category === 'suggestion').length;
+            const countBug = allFeedbacks.filter(f => f.category === 'bug').length;
+
+            const overviewRatingEl = document.getElementById('stat-avg-rating');
+            if (overviewRatingEl) overviewRatingEl.textContent = `${avg} ⭐`;
+
+            const overviewSummaryEl = document.getElementById('stat-feedback-summary');
+            if (overviewSummaryEl) overviewSummaryEl.textContent = `${total} avis joueur${total > 1 ? 's' : ''}`;
+
+            const fbAvgEl = document.getElementById('fb-avg-rating');
+            if (fbAvgEl) fbAvgEl.textContent = `${avg} ⭐`;
+
+            const fbRatingCountEl = document.getElementById('fb-rating-count');
+            if (fbRatingCountEl) fbRatingCountEl.textContent = `Basé sur ${total} retour${total > 1 ? 's' : ''}`;
+
+            const sugCountEl = document.getElementById('fb-suggestions-count');
+            if (sugCountEl) sugCountEl.textContent = countSug;
+
+            const bugCountEl = document.getElementById('fb-bugs-count');
+            if (bugCountEl) bugCountEl.textContent = countBug;
+
+            // Filter chips counts
+            const cntAll = document.getElementById('count-all');
+            if (cntAll) cntAll.textContent = total;
+            const cntAv = document.getElementById('count-avis');
+            if (cntAv) cntAv.textContent = countAvis;
+            const cntSg = document.getElementById('count-suggestion');
+            if (cntSg) cntSg.textContent = countSug;
+            const cntBg = document.getElementById('count-bug');
+            if (cntBg) cntBg.textContent = countBug;
+
+            renderFeedbacks();
+        }
+
+        if (manual) {
+            showToast("Données actualisées en direct !", "success");
+        }
+    } catch (e) {
+        if (manual) showToast("Erreur lors de l'actualisation : " + e.message, "error");
+    }
+}
+
+function renderLiveSessions(sessions) {
+    const tbody = document.getElementById('live-players-tbody');
+    if (!tbody) return;
+
+    if (!sessions || sessions.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td><span class="status-badge online"><span class="pulse-dot"></span> En attente</span></td>
+                <td><strong>Joueur Mobile</strong></td>
+                <td>Niveau 1</td>
+                <td>1 min</td>
+                <td>En ligne</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = sessions.map(s => `
+        <tr>
+            <td><span class="status-badge online"><span class="pulse-dot"></span> En jeu</span></td>
+            <td><strong>${escapeHtml(s.playerName || 'Joueur')}</strong></td>
+            <td><span class="badge badge-gold">Niveau ${escapeHtml(String(s.level || 1))}</span></td>
+            <td>${s.activeMinutes || 1} min</td>
+            <td>${s.lastSeenSecondsAgo < 30 ? "À l'instant" : `Il y a ${s.lastSeenSecondsAgo}s`}</td>
+        </tr>
+    `).join('');
+}
+
+function renderFeedbacks() {
+    const tbody = document.getElementById('feedbacks-tbody');
+    if (!tbody) return;
+
+    let filtered = allFeedbacks;
+    if (currentFbFilter !== 'all') {
+        filtered = allFeedbacks.filter(f => f.category === currentFbFilter);
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Aucun avis dans cette catégorie pour le moment.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(f => {
+        const rating = parseInt(f.rating) || 5;
+        const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+        const catLabels = {
+            'avis': '<span class="category-tag avis"><i class="fas fa-heart"></i> Avis</span>',
+            'suggestion': '<span class="category-tag suggestion"><i class="fas fa-lightbulb"></i> Idée</span>',
+            'bug': '<span class="category-tag bug"><i class="fas fa-bug"></i> Bug</span>'
+        };
+        const dateStr = f.created_at ? new Date(f.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Récemment';
+        const isTreated = f.status === 'traité';
+
+        return `
+            <tr>
+                <td style="white-space:nowrap; font-size:0.82rem; color:var(--text-muted);">${dateStr}</td>
+                <td><strong>${escapeHtml(f.player_name || 'Anonyme')}</strong></td>
+                <td><span class="badge badge-gold">Niv. ${escapeHtml(String(f.level_reached || f.level || 1))}</span></td>
+                <td><span class="star-rating-display">${stars}</span></td>
+                <td>${catLabels[f.category] || f.category}</td>
+                <td style="max-width: 280px; word-break: break-word;">${escapeHtml(f.message || '')}</td>
+                <td><span class="status-badge ${isTreated ? 'traité' : 'nouveau'}">${isTreated ? 'Traité ✅' : 'Nouveau 🆕'}</span></td>
+                <td style="white-space:nowrap;">
+                    ${!isTreated ? `<button class="btn-action-sm btn-treat" onclick="treatFeedback('${escapeHtml(f.id)}')"><i class="fas fa-check"></i> Traiter</button>` : ''}
+                    <button class="btn-action-sm btn-del" onclick="deleteFeedback('${escapeHtml(f.id)}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function treatFeedback(id) {
+    const supabaseKey = localStorage.getItem('dabali_supabase_anon_key') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (supabaseKey) headers['X-Supabase-Key'] = supabaseKey;
+
+    try {
+        const res = await fetch('/api/feedback', {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ id, status: 'traité' })
+        });
+        if (res.ok) {
+            showToast("Avis marqué comme traité !", "success");
+            fetchLiveStats();
+        } else {
+            showToast("Erreur lors de la mise à jour.", "error");
+        }
+    } catch(e) {
+        showToast("Erreur : " + e.message, "error");
+    }
+}
+
+async function deleteFeedback(id) {
+    if (!confirm("Voulez-vous vraiment supprimer cet avis ?")) return;
+
+    const supabaseKey = localStorage.getItem('dabali_supabase_anon_key') || '';
+    const headers = {};
+    if (supabaseKey) headers['X-Supabase-Key'] = supabaseKey;
+
+    try {
+        const res = await fetch(`/api/feedback?id=${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers
+        });
+        if (res.ok) {
+            showToast("Avis supprimé avec succès.", "info");
+            fetchLiveStats();
+        } else {
+            showToast("Erreur lors de la suppression.", "error");
+        }
+    } catch(e) {
+        showToast("Erreur : " + e.message, "error");
+    }
+}
+
+function saveSupabaseAnonKey() {
+    const input = document.getElementById('supabase-anon-key-input');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+        localStorage.removeItem('dabali_supabase_anon_key');
+        const badge = document.getElementById('supabase-status-badge');
+        if (badge) {
+            badge.className = 'badge';
+            badge.textContent = 'Mode Hybride Local';
+        }
+        showToast("Clé Supabase retirée. Utilisation du mode stockage direct Vercel.", "info");
+        fetchLiveStats();
+        return;
+    }
+
+    localStorage.setItem('dabali_supabase_anon_key', val);
+    const badge = document.getElementById('supabase-status-badge');
+    if (badge) {
+        badge.className = 'badge badge-green';
+        badge.textContent = 'Clé Supabase Configurée ✅';
+    }
+    showToast("Clé Supabase enregistrée ! Vos avis seront synchronisés sur le cloud.", "success");
+    fetchLiveStats();
+}
+
+async function testSupabaseConnection() {
+    const key = localStorage.getItem('dabali_supabase_anon_key') || (document.getElementById('supabase-anon-key-input') ? document.getElementById('supabase-anon-key-input').value.trim() : '');
+    if (!key) {
+        showToast("Veuillez d'abord coller votre clé publique anon Supabase.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("https://owiwogingjiumfiyawbk.supabase.co/rest/v1/feedbacks?limit=1", {
+            headers: {
+                "apikey": key,
+                "Authorization": `Bearer ${key}`
+            }
+        });
+        if (res.ok) {
+            showToast("Connexion à Supabase réussie à 100% ! ✅", "success");
+            const badge = document.getElementById('supabase-status-badge');
+            if (badge) {
+                badge.className = 'badge badge-green';
+                badge.textContent = 'Connecté à Supabase ✅';
+            }
+        } else if (res.status === 404) {
+            showToast("Supabase connecté, mais la table 'feedbacks' n'a pas encore été créée. Cliquez sur 'Voir Script SQL' !", "info");
+        } else {
+            showToast(`Erreur Supabase (${res.status}) : Clé non reconnue ou droits manquants.`, "error");
+        }
+    } catch (e) {
+        showToast("Erreur réseau Supabase : " + e.message, "error");
+    }
+}
+
+function toggleSqlModal() {
+    const modal = document.getElementById('sql-modal');
+    if (modal) {
+        modal.classList.toggle('hidden');
+    }
+}
+
+function copySqlCode() {
+    const code = document.getElementById('sql-code-block');
+    if (code) {
+        navigator.clipboard.writeText(code.innerText).then(() => {
+            showToast("Script SQL copié dans le presse-papier ! Collez-le dans Supabase SQL Editor.", "success");
+        }).catch(() => {
+            showToast("Sélectionnez et copiez le texte manuellement.", "info");
+        });
+    }
 }

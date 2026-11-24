@@ -6367,4 +6367,188 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init Game Logic
     const game = new DabaliGame();
     game.init();
+
+    // Start Live Heartbeat & Feedback Modal
+    initHeartbeat();
+    initFeedbackSystem();
 });
+
+/* ==========================================================================
+   HEARTBEAT & LIVE PLAYER TRACKING
+   ========================================================================== */
+function initHeartbeat() {
+    let sessionId = sessionStorage.getItem('dabali_session_id');
+    if (!sessionId) {
+        sessionId = 'dabali-' + Math.random().toString(36).slice(2, 10);
+        sessionStorage.setItem('dabali_session_id', sessionId);
+    }
+
+    const sendBeat = async () => {
+        try {
+            const pName = (typeof playerName !== 'undefined' && playerName) ? playerName : (localStorage.getItem(STORAGE_KEYS.playerName) || 'Joueur');
+            const lvl = (typeof currentLevel !== 'undefined') ? currentLevel : 1;
+            await fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, playerName: pName, level: lvl })
+            });
+        } catch (_) {}
+    };
+
+    // Send immediately & repeat every 60s
+    sendBeat();
+    setInterval(sendBeat, 60000);
+}
+
+/* ==========================================================================
+   PLAYER RATING & FEEDBACK SYSTEM
+   ========================================================================== */
+function initFeedbackSystem() {
+    const openBtn = document.getElementById('open-feedback-btn');
+    const overlay = document.getElementById('feedback-modal-overlay');
+    const closeBtn = document.getElementById('close-feedback-btn');
+    const starBtns = document.querySelectorAll('.star-rating-btn');
+    const legendEl = document.getElementById('rating-legend');
+    const categoryPills = document.querySelectorAll('.category-pill');
+    const nameInput = document.getElementById('feedback-player-name');
+    const msgInput = document.getElementById('feedback-message');
+    const submitBtn = document.getElementById('submit-feedback-btn');
+    const statusEl = document.getElementById('feedback-status-msg');
+
+    if (!overlay) return;
+
+    let selectedRating = 5;
+    let selectedCategory = 'avis';
+
+    const ratingDescriptions = {
+        1: "1/5 - À améliorer 😕",
+        2: "2/5 - Pas mal 🙂",
+        3: "3/5 - Bien ! 👍",
+        4: "4/5 - Très bon ! 🌟",
+        5: "5/5 - C'est trop doux ! 🔥"
+    };
+
+    const updateStars = (val) => {
+        selectedRating = val;
+        starBtns.forEach(btn => {
+            const r = parseInt(btn.dataset.rating, 10);
+            if (r <= val) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        if (legendEl) legendEl.textContent = ratingDescriptions[val] || `${val}/5`;
+    };
+
+    starBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = parseInt(btn.dataset.rating, 10) || 5;
+            updateStars(val);
+        });
+    });
+
+    categoryPills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            categoryPills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            selectedCategory = pill.dataset.category || 'avis';
+        });
+    });
+
+    const openModal = () => {
+        if (typeof closeDrawer === 'function') closeDrawer();
+        if (nameInput) {
+            const cur = (typeof playerName !== 'undefined' && playerName) ? playerName : (localStorage.getItem(STORAGE_KEYS.playerName) || '');
+            if (cur && cur !== 'Joueur') nameInput.value = cur;
+        }
+        if (statusEl) {
+            statusEl.classList.add('hidden');
+            statusEl.textContent = '';
+        }
+        overlay.classList.remove('hidden');
+    };
+
+    const closeModal = () => {
+        overlay.classList.add('hidden');
+    };
+
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            const msg = (msgInput ? msgInput.value : '').trim();
+            if (!msg) {
+                if (statusEl) {
+                    statusEl.className = 'feedback-status-msg error';
+                    statusEl.textContent = "Merci d'écrire un petit mot avant d'envoyer !";
+                    statusEl.classList.remove('hidden');
+                }
+                if (msgInput) msgInput.focus();
+                return;
+            }
+
+            const pName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (playerName || 'Gourmet Anonyme');
+            const lvl = (typeof currentLevel !== 'undefined') ? currentLevel : 1;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Envoi en cours...`;
+
+            try {
+                const res = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        player_name: pName,
+                        rating: selectedRating,
+                        category: selectedCategory,
+                        message: msg,
+                        level: lvl
+                    })
+                });
+
+                if (res.ok) {
+                    if (statusEl) {
+                        statusEl.className = 'feedback-status-msg success';
+                        statusEl.innerHTML = `🎉 Merci <strong>${escapeHtmlText(pName)}</strong> ! Votre avis a bien été transmis au Chef !`;
+                        statusEl.classList.remove('hidden');
+                    }
+                    if (typeof soundManager !== 'undefined' && soundManager.playWin) {
+                        try { soundManager.playWin(); } catch(_) {}
+                    }
+                    if (msgInput) msgInput.value = '';
+                    setTimeout(() => {
+                        closeModal();
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Envoyer au Chef`;
+                    }, 2200);
+                } else {
+                    throw new Error("Erreur de transmission");
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.className = 'feedback-status-msg error';
+                    statusEl.textContent = "Impossible d'envoyer l'avis pour le moment. Réessayez bientôt !";
+                    statusEl.classList.remove('hidden');
+                }
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Réessayer`;
+            }
+        });
+    }
+}
+
+function escapeHtmlText(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    }[tag] || tag));
+}

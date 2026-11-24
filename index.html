@@ -83,6 +83,10 @@
                 <span>Carte des niveaux</span>
                 <i class="fas fa-map"></i>
             </div>
+            <div class="drawer-item clickable-item feedback-drawer-btn" id="open-feedback-btn">
+                <span>⭐ Noter &amp; Donner son avis</span>
+                <i class="fas fa-star" style="color:#FFD700;"></i>
+            </div>
             <div class="drawer-item clickable-item hidden" id="promo-code-btn" style="display:none !important;">
                 <span>Code partenaire</span>
                 <i class="fas fa-gift"></i>
@@ -372,6 +376,54 @@
             <i class="fas fa-mobile-alt ios-pwa-icon"></i>
             <span>Pour jouer en plein écran sur iPhone : touche <strong>Partager</strong> <i class="fas fa-arrow-up-from-bracket"></i> puis <strong>« Sur l'écran d'accueil »</strong> 📲</span>
             <button id="close-ios-pwa-btn" type="button" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- Rating & Feedback Modal -->
+    <div id="feedback-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+        <div class="modal-card feedback-modal-card">
+            <button id="close-feedback-btn" class="modal-close-btn" aria-label="Fermer"><i class="fas fa-times"></i></button>
+            <div class="feedback-header">
+                <div class="feedback-icon-badge">⭐</div>
+                <h3 id="feedback-title">Donnez votre avis au Chef !</h3>
+                <p class="feedback-subtitle">Une note, une idée ou un retour ? On vous écoute pour rendre Dabali Game encore plus doux !</p>
+            </div>
+
+            <div class="feedback-stars-container">
+                <span class="feedback-stars-label">Votre appréciation :</span>
+                <div class="stars-rating-row" id="stars-rating-row">
+                    <button type="button" class="star-rating-btn active" data-rating="1" aria-label="1 étoile">★</button>
+                    <button type="button" class="star-rating-btn active" data-rating="2" aria-label="2 étoiles">★</button>
+                    <button type="button" class="star-rating-btn active" data-rating="3" aria-label="3 étoiles">★</button>
+                    <button type="button" class="star-rating-btn active" data-rating="4" aria-label="4 étoiles">★</button>
+                    <button type="button" class="star-rating-btn active" data-rating="5" aria-label="5 étoiles">★</button>
+                </div>
+                <div class="rating-legend" id="rating-legend">5/5 - C'est trop doux ! 🔥</div>
+            </div>
+
+            <div class="feedback-category-group">
+                <span class="feedback-field-label">Type de retour :</span>
+                <div class="feedback-category-pills">
+                    <button type="button" class="category-pill active" data-category="avis"><i class="fas fa-heart"></i> Avis général</button>
+                    <button type="button" class="category-pill" data-category="suggestion"><i class="fas fa-lightbulb"></i> Suggestion</button>
+                    <button type="button" class="category-pill" data-category="bug"><i class="fas fa-bug"></i> Signaler un bug</button>
+                </div>
+            </div>
+
+            <div class="feedback-input-group">
+                <label for="feedback-player-name" class="feedback-field-label">Votre nom ou pseudo :</label>
+                <input type="text" id="feedback-player-name" class="feedback-input" placeholder="Ex: Kouassi le Gourmet" maxlength="40">
+            </div>
+
+            <div class="feedback-input-group">
+                <label for="feedback-message" class="feedback-field-label">Votre message :</label>
+                <textarea id="feedback-message" class="feedback-textarea" rows="3" placeholder="Dites-nous ce qui vous plaît ou ce qu'on peut améliorer..."></textarea>
+            </div>
+
+            <button id="submit-feedback-btn" type="button" class="btn-submit-feedback">
+                <i class="fas fa-paper-plane"></i> Envoyer au Chef
+            </button>
+            <div id="feedback-status-msg" class="feedback-status-msg hidden"></div>
         </div>
     </div>
 </body>
