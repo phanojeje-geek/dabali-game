@@ -29,7 +29,7 @@
       ]
     }
   ],
-  "rewrites": [
+  "redirects": [
     {
       "source": "/",
       "has": [
@@ -38,18 +38,11 @@
           "value": "admin.kev-in.site"
         }
       ],
-      "destination": "/admin/index.html"
-    },
-    {
-      "source": "/((?!api|assets|admin).*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "admin.kev-in.site"
-        }
-      ],
-      "destination": "/admin/index.html"
-    },
+      "destination": "/admin",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
     {
       "source": "/admin",
       "destination": "/admin/index.html"
