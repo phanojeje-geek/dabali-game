@@ -3292,21 +3292,69 @@ function clearHints() {
     if (currentHint) {
         currentHint.forEach(el => {
             if (el && el.classList) {
-                el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-anim');
+                el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-dest-tile', 'hint-anim');
             }
-            if (el && el.classList && el.classList.contains('hand-hint')) {
+            if (el && el.classList && (el.classList.contains('hand-hint') || el.classList.contains('hint-directional-arrow'))) {
                 el.remove();
             }
         });
         currentHint = null;
     }
     // Remove any stray hints in DOM
-    document.querySelectorAll('.hand-hint').forEach(h => h.remove());
-    document.querySelectorAll('.hint-source-tile, .hint-target-tile, .hint-anim').forEach(el => {
-        el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-anim');
+    document.querySelectorAll('.hand-hint, .hint-directional-arrow').forEach(h => h.remove());
+    document.querySelectorAll('.hint-source-tile, .hint-target-tile, .hint-dest-tile, .hint-anim').forEach(el => {
+        el.classList.remove('hint-source-tile', 'hint-target-tile', 'hint-dest-tile', 'hint-anim');
     });
 }
 const clearHint = clearHints;
+
+function isHoleTile(r, c) {
+    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return false;
+    if (currentLayout && currentLayout[r] && currentLayout[r][c] === 0) return true;
+    const tile = grid[r] && grid[r][c];
+    if (!tile) return true;
+    if (tile.type && (tile.type.id === 'hole' || tile.type.id === 'crate')) return true;
+    return false;
+}
+
+function calculateVoidScore(from, to) {
+    let score = 0;
+    const dr = to.r - from.r;
+    const dc = to.c - from.c;
+
+    // Check what is beyond 'to' in swipe direction:
+    const beyondR = to.r + dr;
+    const beyondC = to.c + dc;
+    if (isHoleTile(beyondR, beyondC)) {
+        // Swiping directly towards an internal hole! Strong penalty!
+        score -= 16;
+    }
+
+    // Check what is behind 'from':
+    const behindR = from.r - dr;
+    const behindC = from.c - dc;
+    if (isHoleTile(behindR, behindC)) {
+        // Swiping AWAY from an internal hole! High reward!
+        score += 12;
+    }
+
+    // Check adjacent holes around 'to':
+    const neighbors = [
+        { r: to.r - 1, c: to.c },
+        { r: to.r + 1, c: to.c },
+        { r: to.r, c: to.c - 1 },
+        { r: to.r, c: to.c + 1 }
+    ];
+    let adjacentHoles = 0;
+    neighbors.forEach(n => {
+        if (!(n.r === from.r && n.c === from.c) && isHoleTile(n.r, n.c)) {
+            adjacentHoles++;
+        }
+    });
+    score -= (adjacentHoles * 4);
+
+    return score;
+}
 
 async function showHint() {
     clearHints();
@@ -3351,19 +3399,34 @@ async function showHint() {
                 if (hasMatch1 || hasMatch2) {
                     let moveInfo;
                     if (hasMatch1 && hasMatch2) {
-                        moveInfo = {
-                            from: { r: n.r, c: n.c },
-                            to: { r: r, c: c },
-                            matchedPositions: [...match1, ...match2],
-                            matchedType: type2.id
-                        };
+                        // Both directions match! Compare anti-void safety:
+                        const scoreA = calculateVoidScore({ r: n.r, c: n.c }, { r: r, c: c });
+                        const scoreB = calculateVoidScore({ r: r, c: c }, { r: n.r, c: n.c });
+                        if (scoreA >= scoreB) {
+                            moveInfo = {
+                                from: { r: n.r, c: n.c },
+                                to: { r: r, c: c },
+                                matchedPositions: [...match1, ...match2],
+                                matchedType: type2.id,
+                                voidScore: scoreA
+                            };
+                        } else {
+                            moveInfo = {
+                                from: { r: r, c: c },
+                                to: { r: n.r, c: n.c },
+                                matchedPositions: [...match1, ...match2],
+                                matchedType: type1.id,
+                                voidScore: scoreB
+                            };
+                        }
                     } else if (hasMatch1) {
                         // t2 moved to (r, c)
                         moveInfo = {
                             from: { r: n.r, c: n.c },
                             to: { r: r, c: c },
                             matchedPositions: match1,
-                            matchedType: type2.id
+                            matchedType: type2.id,
+                            voidScore: calculateVoidScore({ r: n.r, c: n.c }, { r: r, c: c })
                         };
                     } else {
                         // t1 moved to (n.r, n.c)
@@ -3371,14 +3434,15 @@ async function showHint() {
                             from: { r: r, c: c },
                             to: { r: n.r, c: n.c },
                             matchedPositions: match2,
-                            matchedType: type1.id
+                            matchedType: type1.id,
+                            voidScore: calculateVoidScore({ r: r, c: c }, { r: n.r, c: n.c })
                         };
                     }
 
-                    // Score candidate: prioritize current level goals!
+                    // Score candidate: prioritize current level goals AND anti-void safety!
                     const isGoal = currentGoals && currentGoals[moveInfo.matchedType] && 
                                    (goalProgress[moveInfo.matchedType] || 0) < currentGoals[moveInfo.matchedType];
-                    moveInfo.priority = isGoal ? 10 + moveInfo.matchedPositions.length : moveInfo.matchedPositions.length;
+                    moveInfo.priority = (isGoal ? 12 : 0) + (moveInfo.matchedPositions.length * 2) + (moveInfo.voidScore || 0);
                     candidateMoves.push(moveInfo);
                 }
             }
@@ -3390,7 +3454,7 @@ async function showHint() {
         return;
     }
 
-    // Pick highest priority move (prioritizes level goals!)
+    // Pick highest priority move (prioritizes level goals and moves away from holes!)
     candidateMoves.sort((a, b) => b.priority - a.priority);
     const bestMove = candidateMoves[0];
 
@@ -3483,19 +3547,47 @@ function applySmartHint(move) {
     // Highlight source mover tile with glowing cyan border
     fromEl.classList.add('hint-source-tile');
 
+    // Highlight destination tile with distinct green target box
+    toEl.classList.add('hint-dest-tile');
+
     // Highlight target matching tiles with glowing gold
-    const highlightedElements = [fromEl];
+    const highlightedElements = [fromEl, toEl];
     move.matchedPositions.forEach(p => {
-        const t = grid[p.r][p.c];
+        const t = grid[p.r] && grid[p.r][p.c];
         if (t && t.el) {
             t.el.classList.add('hint-target-tile');
             highlightedElements.push(t.el);
         }
     });
 
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    const dx = toRect.left - fromRect.left;
+    const dy = toRect.top - fromRect.top;
+
+    // Calculate rotation angle so the 3D hand finger points in the direction of swipe:
+    // Base glove points UP (0deg).
+    let angle = 0;
+    if (Math.abs(dx) > Math.abs(dy)) {
+        angle = dx > 0 ? 90 : 270;
+    } else {
+        angle = dy > 0 ? 180 : 0;
+    }
+
+    const fromCenterX = fromRect.left + fromRect.width / 2;
+    const fromCenterY = fromRect.top + fromRect.height / 2;
+
     // Create 3D cartoon pointer hand
     const hand = document.createElement('div');
     hand.className = 'hand-hint';
+
+    // Position finger (at 15, 15) exactly at center of fromEl
+    hand.style.left = (fromCenterX - 15) + 'px';
+    hand.style.top = (fromCenterY - 15) + 'px';
+    hand.style.setProperty('--dx', `${dx}px`);
+    hand.style.setProperty('--dy', `${dy}px`);
+    hand.style.setProperty('--hand-rot', `${angle}deg`);
 
     // SVG of crisp 3D glove with glowing cyan ripple
     hand.innerHTML = `
@@ -3535,21 +3627,30 @@ function applySmartHint(move) {
         </svg>
     `;
 
-    const fromRect = fromEl.getBoundingClientRect();
-    const toRect = toEl.getBoundingClientRect();
+    // Create luminous directional chevron arrow
+    const arrow = document.createElement('div');
+    arrow.className = 'hint-directional-arrow';
+    arrow.style.left = (fromCenterX - 18) + 'px';
+    arrow.style.top = (fromCenterY - 18) + 'px';
+    arrow.style.setProperty('--dx', `${dx}px`);
+    arrow.style.setProperty('--dy', `${dy}px`);
+    arrow.style.setProperty('--arrow-rot', `${angle}deg`);
+    arrow.innerHTML = `
+        <svg viewBox="0 0 36 36" width="36" height="36">
+            <defs>
+                <filter id="arrowNeonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#00FFFF"/>
+                </filter>
+            </defs>
+            <path d="M 18 6 L 28 18 L 22 18 L 22 30 L 14 30 L 14 18 L 8 18 Z" 
+                  fill="#00FFFF" stroke="#FFFFFF" stroke-width="2" filter="url(#arrowNeonGlow)"/>
+        </svg>
+    `;
 
-    hand.style.left = (fromRect.left + fromRect.width / 2 - 15) + 'px';
-    hand.style.top = (fromRect.top + fromRect.height / 2 - 15) + 'px';
-
-    const dx = toRect.left - fromRect.left;
-    const dy = toRect.top - fromRect.top;
-
-    hand.style.setProperty('--dx', `${dx}px`);
-    hand.style.setProperty('--dy', `${dy}px`);
-
+    document.body.appendChild(arrow);
     document.body.appendChild(hand);
 
-    highlightedElements.push(hand);
+    highlightedElements.push(arrow, hand);
     currentHint = highlightedElements;
 }
 
