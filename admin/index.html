@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dabali Game - Espace Administration 🇨🇮</title>
-    <link rel="stylesheet" href="style.css">
+    <base href="/admin/">
+    <link rel="stylesheet" href="/admin/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <link rel="icon" type="image/png" href="../assets/splash_chef.png">
+    <link rel="icon" type="image/png" href="/assets/splash_chef.png">
 </head>
 <body>
     <!-- Login Overlay -->
@@ -20,12 +21,20 @@
             <form id="login-form">
                 <div class="form-group">
                     <label for="admin-pin"><i class="fas fa-lock"></i> Clé d'accès administrateur</label>
-                    <input type="password" id="admin-pin" placeholder="Entrez la clé secrète..." required autocomplete="current-password">
+                    <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                        <input type="password" id="admin-pin" value="dabali2026admin" placeholder="Entrez la clé secrète..." required autocomplete="current-password" style="width: 100%; padding-right: 44px;">
+                        <button type="button" id="toggle-pwd-btn" style="position: absolute; right: 12px; background: transparent; border: none; color: #FFD700; cursor: pointer; font-size: 1.15rem;" title="Afficher/Masquer le mot de passe">
+                            <i class="fas fa-eye" id="toggle-pwd-icon"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="login-error" class="login-error hidden">Clé incorrecte. Veuillez réessayer.</div>
                 <button type="submit" class="btn btn-primary btn-block">
                     <span>Accéder au Dashboard</span>
                     <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="button" id="btn-quick-login" class="btn btn-block" style="background: linear-gradient(135deg, #009A44, #007A34); color: white; border: 1.5px solid #FFD700; font-weight: bold; margin-top: 10px; cursor: pointer;">
+                    <i class="fas fa-bolt"></i> Connexion Directe (Admin)
                 </button>
                 <div class="login-hint">Clé par défaut : <code>dabali2026admin</code></div>
             </form>
@@ -461,6 +470,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="/admin/app.js"></script>
 </body>
 </html>

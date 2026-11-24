@@ -66,6 +66,50 @@ let isPaused = false;
 let hintTimeout = null;
 let currentHint = null;
 
+// TIME BONUS & HELPER STATE
+let hasSpawnedTimeBonusThisLevel = false;
+let timeBonusTimeout = null;
+let timeBonusCountdownInterval = null;
+
+// CLEANUP TRANSIENT UI & PREVENT STUCK OVERLAYS
+function cleanupTransientUI() {
+    const stuckSelectors = [
+        '#nomove-msg',
+        '.nomove-toast',
+        '.chef-helper-toast',
+        '.floating-score-pop',
+        '.time-bonus-avatar-wrapper',
+        '.time-bonus-bubble',
+        '.hand-hint',
+        '#super-combo-msg',
+        '.garba-chaud-banner',
+        '.woyo-banner'
+    ];
+    stuckSelectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+    });
+
+    if (window.chefHelperInterval) {
+        clearInterval(window.chefHelperInterval);
+        window.chefHelperInterval = null;
+    }
+    if (window.timeBonusTimeout) {
+        clearTimeout(window.timeBonusTimeout);
+        window.timeBonusTimeout = null;
+    }
+    if (window.timeBonusCountdownInterval) {
+        clearInterval(window.timeBonusCountdownInterval);
+        window.timeBonusCountdownInterval = null;
+    }
+    if (hintTimeout) {
+        clearTimeout(hintTimeout);
+        hintTimeout = null;
+    }
+    clearHints();
+}
+
 // BOOSTERS LOGIC STATE
 let activeBooster = null; // 'bomb', 'lightning', 'shuffle', or null
 let swapSourceTile = null;
@@ -85,11 +129,21 @@ function escapeHtml(str) {
 function spawnChefJokerHelper() {
     if (isProcessing || isPaused || moves <= 0) return;
     
+    // Check if a joker already exists on the grid - don't duplicate
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const t = grid[r] && grid[r][c];
+            if (t && (t.type.id === "joker" || t.type.special === "joker")) {
+                return;
+            }
+        }
+    }
+
     const normalTiles = [];
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            const t = grid[r][c];
-            if (t && !isObstacleId(t.type.id) && !isSpecialTile(t)) {
+            const t = grid[r] && grid[r][c];
+            if (t && t.type && !isObstacleId(t.type.id) && !isSpecialTile(t)) {
                 normalTiles.push(t);
             }
         }
@@ -97,11 +151,18 @@ function spawnChefJokerHelper() {
     if (normalTiles.length === 0) return;
     const targetTile = normalTiles[Math.floor(Math.random() * normalTiles.length)];
     
+    // Remove previous helper toasts
+    document.querySelectorAll('.chef-helper-toast').forEach(t => t.remove());
+
     const toast = document.createElement("div");
     toast.className = "chef-helper-toast";
+    toast.style.pointerEvents = "none";
     toast.innerHTML = `<span style="font-size:1.8rem;">👨🏾‍🍳</span> <span>Cadeau du Chef : Joker Éclair ! ⚡</span>`;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2400);
+    setTimeout(() => {
+        if (toast.parentNode) toast.remove();
+    }, 2400);
+
     if (typeof soundManager !== 'undefined' && soundManager.playPromoSuccess) {
         soundManager.playPromoSuccess();
     }
@@ -110,8 +171,127 @@ function spawnChefJokerHelper() {
     renderTileContent(targetTile.el, targetTile.type);
     targetTile.el.classList.add("pop-anim");
     
-    const rct = targetTile.el.getBoundingClientRect();
-    showFloatingScore(rct.left + rct.width / 2, rct.top - 15, "JOKER DU CHEF ! 👨🏾‍🍳⚡", "#FFD700");
+    if (targetTile.el) {
+        const rct = targetTile.el.getBoundingClientRect();
+        showFloatingScore(rct.left + rct.width / 2, rct.top - 15, "JOKER DU CHEF ! 👨🏾‍🍳⚡", "#FFD700");
+    }
+}
+
+// BONUS DE TEMPS : AVATAR ANIMÉ DU CHEF GARBAMAN (+15s CHRONO)
+function spawnTimeBonusAvatar() {
+    if (isPaused || isProcessing || moves <= 0) return;
+    if (document.getElementById('time-bonus-avatar')) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'time-bonus-avatar';
+    wrapper.className = 'time-bonus-avatar-wrapper';
+    wrapper.innerHTML = `
+        <div class="time-bonus-bubble" id="time-bonus-bubble">
+            <div class="bonus-tag"><i class="fas fa-stopwatch"></i> BONUS DU CHEF !</div>
+            <div class="bonus-cta">Touche-moi vite ! <strong>+15s</strong> ⚡</div>
+            <div class="bonus-timer-bar">
+                <div class="bonus-timer-fill" id="bonus-timer-fill"></div>
+            </div>
+        </div>
+        <div class="time-bonus-mascot" id="time-bonus-mascot-btn" role="button" aria-label="Réclamer le bonus de temps">
+            <div class="mascot-aura"></div>
+            <img src="assets/splash_chef.png" alt="Chef Garbaman" class="mascot-img">
+            <div class="mascot-badge">+15s ⏰</div>
+        </div>
+    `;
+
+    document.body.appendChild(wrapper);
+
+    if (typeof soundManager !== 'undefined' && soundManager.playAdStart) {
+        soundManager.playAdStart();
+    }
+
+    let isClaimed = false;
+    const mascotBtn = wrapper.querySelector('#time-bonus-mascot-btn');
+    const bubble = wrapper.querySelector('#time-bonus-bubble');
+
+    const handleClaim = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (isClaimed) return;
+        isClaimed = true;
+
+        if (window.timeBonusTimeout) clearTimeout(window.timeBonusTimeout);
+        if (window.timeBonusCountdownInterval) clearInterval(window.timeBonusCountdownInterval);
+
+        // Add +15 seconds
+        timeRemaining += 15;
+        updateTimerUI();
+
+        // Flash timer bar
+        if (timerEl && timerEl.parentElement) {
+            timerEl.parentElement.classList.remove('time-bonus-flash');
+            void timerEl.parentElement.offsetWidth; // Force reflow
+            timerEl.parentElement.classList.add('time-bonus-flash');
+            setTimeout(() => {
+                if (timerEl && timerEl.parentElement) {
+                    timerEl.parentElement.classList.remove('time-bonus-flash');
+                }
+            }, 1200);
+        }
+
+        // Audio & vibration
+        if (typeof soundManager !== 'undefined' && soundManager.playBonusTime) {
+            soundManager.playBonusTime();
+        }
+        vibrate([70, 40, 110]);
+
+        // Arcade floating score
+        const rect = mascotBtn.getBoundingClientRect();
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 20, "+15 SECONDES ! ⏰⚡", "#00FF7F");
+
+        // Happy celebration on mascot
+        wrapper.classList.add('avatar-claimed');
+        bubble.innerHTML = `<div class="bonus-tag">🍲 CHEF CONTENT !</div><div class="bonus-cta"><strong>+15s ajoutées dé !</strong> 🎉</div>`;
+
+        createBonusSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+        setTimeout(() => {
+            wrapper.classList.add('avatar-fly-out');
+            setTimeout(() => {
+                if (wrapper.parentNode) wrapper.remove();
+            }, 450);
+        }, 850);
+    };
+
+    mascotBtn.addEventListener('click', handleClaim);
+    mascotBtn.addEventListener('touchstart', handleClaim, { passive: false });
+
+    window.timeBonusTimeout = setTimeout(() => {
+        if (isClaimed) return;
+        isClaimed = true;
+        bubble.innerHTML = `<div class="bonus-tag">👋🏾 TROP TARD DÉ !</div><div class="bonus-cta">À la prochaine ! 🍲</div>`;
+        wrapper.classList.add('avatar-expired');
+        setTimeout(() => {
+            if (wrapper.parentNode) wrapper.remove();
+        }, 500);
+    }, 12000);
+}
+
+function createBonusSparkles(cx, cy) {
+    for (let i = 0; i < 12; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark-particle';
+        const angle = (i / 12) * Math.PI * 2;
+        const dist = 35 + Math.random() * 45;
+        spark.style.setProperty('--tx', `${Math.cos(angle) * dist}px`);
+        spark.style.setProperty('--ty', `${Math.sin(angle) * dist}px`);
+        spark.style.left = `${cx}px`;
+        spark.style.top = `${cy}px`;
+        spark.style.background = i % 2 === 0 ? '#FFD700' : '#00FF7F';
+        spark.style.pointerEvents = 'none';
+        document.body.appendChild(spark);
+        setTimeout(() => {
+            if (spark.parentNode) spark.remove();
+        }, 600);
+    }
 }
 
 // ... (Existing code)
@@ -917,9 +1097,12 @@ function showFloatingScore(x, y, text, color = "#FFD700") {
     el.innerText = text;
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
+    el.style.pointerEvents = "none";
     if (color) el.style.color = color;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 850);
+    setTimeout(() => {
+        if (el.parentNode) el.remove();
+    }, 850);
 }
 
 function showFloatingText(x, y, text, color = "#FFD700") {
@@ -1956,6 +2139,13 @@ const soundManager = {
         setTimeout(() => soundManager.playTone(750, "square", 0.14), 90);
         setTimeout(() => soundManager.playTone(950, "square", 0.16), 180);
     },
+    playBonusTime: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        const freqs = [440, 554, 659, 880, 1108];
+        freqs.forEach((f, i) => {
+            setTimeout(() => soundManager.playTone(f, "triangle", 0.16), i * 70);
+        });
+    },
     playExplosion: () => {
         if (!isSoundOn || soundVolume <= 0) return;
         if (!ensureAudioContextReady()) return;
@@ -2832,6 +3022,9 @@ function togglePause() {
     if (isPaused) {
         clearHints();
         clearInterval(timerInterval);
+        const activeBonus = document.getElementById('time-bonus-avatar');
+        if (activeBonus) activeBonus.remove();
+        if (window.timeBonusTimeout) clearTimeout(window.timeBonusTimeout);
         isProcessing = true; // Block game
         if (pauseBtn) pauseBtn.innerHTML = '<i class="fas fa-play"></i>';
         
@@ -2964,6 +3157,9 @@ function quitGame() {
 function startLevel(lvl, resume = false) {
     console.log(`[DEBUG] startLevel called with lvl=${lvl}, resume=${resume}`);
     try {
+        cleanupTransientUI();
+        hasSpawnedTimeBonusThisLevel = false;
+
         if (resume && loadGameState()) {
             console.log("[DEBUG] Resuming game state...");
             applyThemeForLevel(level);
@@ -3060,6 +3256,12 @@ function startTimer() {
         if (isPaused) return;
         timeRemaining--;
         updateTimerUI();
+        
+        // Spawn Chef Time Bonus Avatar when time is running down (<= 45s left)
+        if (timeRemaining <= 45 && !hasSpawnedTimeBonusThisLevel && moves > 0 && !isProcessing) {
+            hasSpawnedTimeBonusThisLevel = true;
+            spawnTimeBonusAvatar();
+        }
         
         if (timeRemaining <= 0) {
             clearInterval(timerInterval);
@@ -3368,7 +3570,7 @@ function updateTimerUI() {
 
 function handleGameOver() {
     isProcessing = true;
-    // setAvatarMood('angry'); // Removed
+    cleanupTransientUI();
     setTimeout(() => {
         vibrate([200, 120, 200, 120, 260]);
         document.getElementById('modal-title').innerText = "YAKO !";
@@ -3383,54 +3585,118 @@ function handleGameOver() {
     }, 500);
 }
 
+function hasAnyPossibleMove() {
+    for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+            const t1 = grid[r] && grid[r][c];
+            if (!t1 || isObstacleId(t1.type.id)) continue;
+            // Any special or joker tile is an actionable move
+            if (isSpecialTile(t1) || isColorBombTile(t1) || t1.type.id === "joker" || t1.type.special === "joker") {
+                return true;
+            }
+            if (c + 1 < GRID_SIZE && checkSwapForMatch(r, c, r, c + 1)) return true;
+            if (r + 1 < GRID_SIZE && checkSwapForMatch(r, c, r + 1, c)) return true;
+        }
+    }
+    return false;
+}
+
 function handleNoMovesAvailable() {
     if (isProcessing || isPaused) return;
     vibrate([100, 80, 100]);
+    
+    // Remove any previous nomove messages
+    document.querySelectorAll('#nomove-msg, .nomove-toast').forEach(el => el.remove());
+
     const msg = document.createElement('div');
     msg.id = 'nomove-msg';
-    msg.innerHTML = `${escapeHtml(playerName)}, y'a plus de coups là...<br><strong>On mélange le Dabali !</strong>`;
+    msg.className = 'nomove-toast';
+    msg.innerHTML = `${escapeHtml(playerName)}, y'a plus de coups là...<br><strong>On mélange le Dabali ! 🍲</strong>`;
     msg.style.position = 'fixed';
     msg.style.top = '50%';
     msg.style.left = '50%';
     msg.style.transform = 'translate(-50%, -50%)';
-    msg.style.background = 'rgba(0,0,0,0.8)';
-    msg.style.color = 'white';
-    msg.style.padding = '15px 20px';
-    msg.style.borderRadius = '15px';
-    msg.style.zIndex = '2200';
+    msg.style.background = 'linear-gradient(135deg, rgba(25, 20, 15, 0.95), rgba(10, 10, 10, 0.95))';
+    msg.style.border = '2px solid #FFD700';
+    msg.style.boxShadow = '0 10px 30px rgba(0,0,0,0.8), 0 0 25px rgba(255, 140, 0, 0.6)';
+    msg.style.color = '#FFFFFF';
+    msg.style.padding = '15px 22px';
+    msg.style.borderRadius = '18px';
+    msg.style.zIndex = '9999';
     msg.style.textAlign = 'center';
+    msg.style.pointerEvents = 'none';
+    msg.style.fontFamily = "'Arial Black', Impact, sans-serif";
+    msg.style.fontSize = '1.15rem';
     document.body.appendChild(msg);
-    reshuffleGrid();
-    setTimeout(() => {
-        if (msg.parentNode) msg.parentNode.removeChild(msg);
-        resetHintTimer();
-    }, 1500);
+
+    try {
+        reshuffleGrid();
+    } catch (e) {
+        console.error("Erreur reshuffleGrid:", e);
+    } finally {
+        setTimeout(() => {
+            if (msg.parentNode) msg.remove();
+            resetHintTimer();
+        }, 1600);
+    }
 }
 
 function reshuffleGrid() {
+    const validCells = [];
     const types = [];
     for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-            const tile = grid[r][c];
-            if (!isObstacleId(tile.type.id)) {
+            const tile = grid[r] && grid[r][c];
+            if (tile && tile.type && !isObstacleId(tile.type.id)) {
+                validCells.push(tile);
                 types.push(tile.type);
             }
         }
     }
-    for (let i = types.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const tmp = types[i];
-        types[i] = types[j];
-        types[j] = tmp;
+    if (validCells.length < 3) return;
+
+    let attempts = 0;
+    let foundValid = false;
+    while (attempts < 10 && !foundValid) {
+        attempts++;
+        for (let i = types.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = types[i];
+            types[i] = types[j];
+            types[j] = tmp;
+        }
+        for (let i = 0; i < validCells.length; i++) {
+            validCells[i].type = types[i];
+        }
+        foundValid = hasAnyPossibleMove();
     }
-    let index = 0;
-    for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-            const tile = grid[r][c];
-            if (!isObstacleId(tile.type.id)) {
-                tile.type = types[index++];
-                renderTileContent(tile.el, tile.type);
+
+    // Guarantee at least one valid match if random shuffle was deadlocked
+    if (!foundValid && validCells.length >= 3) {
+        const goalTypes = Object.keys(currentGoals).filter(k => (goalProgress[k] || 0) < currentGoals[k]);
+        const chosenId = goalTypes.length > 0 ? goalTypes[0] : 'attieke';
+        const baseItem = INGREDIENTS.find(it => it.id === chosenId) || INGREDIENTS[0];
+        
+        let paired = false;
+        for (let i = 0; i < validCells.length && !paired; i++) {
+            const t1 = validCells[i];
+            for (let j = i + 1; j < validCells.length && !paired; j++) {
+                const t2 = validCells[j];
+                const dist = Math.abs(t1.r - t2.r) + Math.abs(t1.c - t2.c);
+                if (dist === 1) {
+                    t1.type = { ...baseItem };
+                    t2.type = { ...baseItem };
+                    paired = true;
+                }
             }
+        }
+    }
+
+    for (let i = 0; i < validCells.length; i++) {
+        const tile = validCells[i];
+        if (tile && tile.el) {
+            renderTileContent(tile.el, tile.type);
+            tile.el.classList.add("pop-anim");
         }
     }
 }
@@ -5157,6 +5423,7 @@ function checkGameEnd() {
 
     if (allGoalsCompleted) {
         clearInterval(timerInterval);
+        cleanupTransientUI();
         isProcessing = true;
         
         // Célébration Sugar Crush "GARBA CHAUD !"
@@ -5260,6 +5527,7 @@ function checkGameEnd() {
     // Loss Condition (Moves)
     if (moves <= 0) {
         clearInterval(timerInterval); // Stop Timer
+        cleanupTransientUI();
         setTimeout(() => {
             document.getElementById('modal-title').innerText = "Plus de mouvements !";
             document.getElementById('modal-message').innerText = `Dommage ${playerName}, tu n'as plus de mouvements.`;

@@ -2870,3 +2870,188 @@ input:checked + .slider:before { transform: translateX(26px); }
     0% { filter: brightness(1); }
     100% { filter: brightness(1.25); }
 }
+
+/* 10. Toasts & Popups Anti-Stuck & Animation */
+.nomove-toast {
+    animation: noMovesToastAnim 1.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+@keyframes noMovesToastAnim {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(0.9); }
+}
+
+/* 11. Bonus de Temps Avatar & Animation */
+.time-bonus-avatar-wrapper {
+    position: fixed;
+    bottom: 95px;
+    right: 14px;
+    z-index: 9990;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    animation: avatarSlideIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes avatarSlideIn {
+    0% { opacity: 0; transform: translate(120%, 40%) scale(0.4); }
+    70% { opacity: 1; transform: translate(-8px, -4px) scale(1.08); }
+    100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+.time-bonus-avatar-wrapper.avatar-fly-out,
+.time-bonus-avatar-wrapper.avatar-expired {
+    animation: avatarSlideOut 0.45s ease-in forwards !important;
+}
+
+@keyframes avatarSlideOut {
+    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(140%, 30%) scale(0.4); }
+}
+
+.time-bonus-bubble {
+    background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(40, 25, 10, 0.95));
+    border: 2px solid #FFD700;
+    border-radius: 16px 16px 4px 16px;
+    padding: 8px 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 15px rgba(255, 215, 0, 0.5);
+    color: #FFFFFF;
+    text-align: right;
+    pointer-events: none;
+    max-width: 220px;
+    animation: bubblePulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes bubblePulse {
+    0% { transform: scale(0.98); }
+    100% { transform: scale(1.02); }
+}
+
+.time-bonus-bubble .bonus-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #FFD700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.time-bonus-bubble .bonus-cta {
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 0.95rem;
+    color: #FFF;
+    margin: 2px 0 4px;
+}
+
+.time-bonus-bubble .bonus-cta strong {
+    color: #00FF7F;
+    text-shadow: 0 0 8px rgba(0,255,127,0.8);
+}
+
+.bonus-timer-bar {
+    width: 100%;
+    height: 5px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.bonus-timer-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #FF4500, #FFD700, #00FF7F);
+    animation: bonusTimerCountdown 12s linear forwards;
+    transform-origin: left center;
+}
+
+@keyframes bonusTimerCountdown {
+    0% { transform: scaleX(1); }
+    100% { transform: scaleX(0); }
+}
+
+.time-bonus-mascot {
+    position: relative;
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    transition: transform 0.15s ease;
+}
+
+.time-bonus-mascot:active {
+    transform: scale(0.92);
+}
+
+.mascot-aura {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,215,0,0.6) 0%, rgba(255,69,0,0.4) 60%, transparent 80%);
+    animation: mascotAuraPulse 1.2s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes mascotAuraPulse {
+    0% { transform: scale(0.95); opacity: 0.7; }
+    100% { transform: scale(1.15); opacity: 1; }
+}
+
+.time-bonus-mascot .mascot-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #FFD700;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.7), 0 0 16px rgba(255,215,0,0.8);
+    background: #FF8200;
+    pointer-events: none;
+    animation: mascotBobbing 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes mascotBobbing {
+    0% { transform: translateY(0) rotate(-2deg); }
+    100% { transform: translateY(-6px) rotate(3deg); }
+}
+
+.time-bonus-mascot .mascot-badge {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #009A44;
+    color: #FFFFFF;
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1.5px solid #FFD700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.avatar-claimed .time-bonus-mascot {
+    animation: avatarClaimHop 0.7s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards !important;
+}
+
+@keyframes avatarClaimHop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.3) translateY(-18px) rotate(10deg); filter: brightness(1.3); }
+    100% { transform: scale(1.1) translateY(-6px); }
+}
+
+/* Flash vert doré quand le temps est crédité */
+.time-bonus-flash {
+    animation: timeBonusFlashAnim 1s ease forwards !important;
+}
+
+@keyframes timeBonusFlashAnim {
+    0% { background: #00FF7F !important; box-shadow: 0 0 30px #00FF7F, 0 0 50px #FFD700 !important; transform: scale(1.12); }
+    50% { background: #FFD700 !important; box-shadow: 0 0 20px #FFD700 !important; transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
