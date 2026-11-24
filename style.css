@@ -3105,3 +3105,229 @@ input:checked + .slider:before { transform: translateX(26px); }
     50% { background: #FFD700 !important; box-shadow: 0 0 20px #FFD700 !important; transform: scale(1.05); }
     100% { transform: scale(1); }
 }
+
+/* ===================================================
+   SUPER COMBOS IVOIRIENS : BANNIÈRES & EFFETS SPÉCIAUX
+   =================================================== */
+
+.super-combo-banner-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: none;
+    perspective: 800px;
+}
+
+.combo-banner-card {
+    position: relative;
+    background: radial-gradient(circle, rgba(20, 20, 30, 0.95) 0%, rgba(10, 10, 15, 0.98) 100%);
+    border: 4px solid var(--banner-color, #FFD700);
+    border-radius: 20px;
+    padding: 24px 36px;
+    text-align: center;
+    box-shadow: 0 0 35px var(--banner-color, #FFD700), 0 10px 40px rgba(0, 0, 0, 0.8), inset 0 0 20px var(--banner-color, #FFD700);
+    animation: bannerPopIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    transform-origin: center center;
+    overflow: hidden;
+}
+
+@keyframes bannerPopIn {
+    0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+    70% { transform: scale(1.08) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.super-combo-banner-overlay.banner-exit .combo-banner-card {
+    animation: bannerPopOut 0.35s ease-in forwards;
+}
+
+@keyframes bannerPopOut {
+    0% { transform: scale(1) translateY(0); opacity: 1; }
+    100% { transform: scale(1.2) translateY(-60px); opacity: 0; }
+}
+
+.combo-banner-rays {
+    position: absolute;
+    inset: -50%;
+    background: conic-gradient(from 0deg, transparent 0deg 20deg, rgba(255,255,255,0.08) 20deg 40deg, transparent 40deg 60deg, rgba(255,255,255,0.08) 60deg 80deg, transparent 80deg 100deg, rgba(255,255,255,0.08) 100deg 120deg, transparent 120deg 140deg, rgba(255,255,255,0.08) 140deg 160deg, transparent 160deg 180deg, rgba(255,255,255,0.08) 180deg 200deg, transparent 200deg 220deg, rgba(255,255,255,0.08) 220deg 240deg, transparent 240deg 260deg, rgba(255,255,255,0.08) 260deg 280deg, transparent 280deg 300deg, rgba(255,255,255,0.08) 300deg 320deg, transparent 320deg 340deg, rgba(255,255,255,0.08) 340deg 360deg);
+    animation: comboRaysRotate 10s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes comboRaysRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.combo-banner-title {
+    position: relative;
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 1.85rem;
+    font-weight: 900;
+    color: #FFFFFF;
+    text-shadow: 0 0 10px var(--banner-color, #FFD700), 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    white-space: nowrap;
+}
+
+.combo-banner-subtitle {
+    position: relative;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--banner-color, #FFD700);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    letter-spacing: 0.5px;
+}
+
+/* COMBO 1: LE FEU DU MAQUIS */
+.feu-maquis-beam {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9988;
+    background: linear-gradient(90deg, transparent 0%, #FF4500 25%, #FFD700 50%, #FF4500 75%, transparent 100%);
+    box-shadow: 0 0 30px #FF4500, 0 0 50px #FF8C00, inset 0 0 15px #FFD700;
+    animation: feuBeamPulse 0.55s ease-out forwards;
+}
+
+.feu-maquis-beam.feu-beam-col {
+    background: linear-gradient(180deg, transparent 0%, #FF4500 25%, #FFD700 50%, #FF4500 75%, transparent 100%);
+}
+
+@keyframes feuBeamPulse {
+    0% { transform: scale(0.6); opacity: 0; filter: brightness(2); }
+    40% { transform: scale(1.05); opacity: 1; filter: brightness(1.5); }
+    100% { transform: scale(1); opacity: 0; filter: brightness(1); }
+}
+
+.maquis-braise-spark {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #FFFFFF 0%, #FFD700 40%, #FF4500 100%);
+    box-shadow: 0 0 12px #FF4500, 0 0 20px #FFD700;
+    pointer-events: none;
+    z-index: 9989;
+    animation: braiseSparkFlight 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes braiseSparkFlight {
+    0% { transform: translate3d(0, 0, 0) scale(1.5); opacity: 1; }
+    80% { opacity: 0.9; }
+    100% { transform: translate3d(var(--tx), var(--ty), 0) scale(0.2); opacity: 0; }
+}
+
+/* COMBO 2: SACHET SURPRISE DU GARBAMAN */
+.flying-garba-fish {
+    position: fixed;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+    z-index: 9992;
+    will-change: transform, opacity;
+}
+
+.flying-fish-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 12px #FFD700) drop-shadow(0 0 20px #FF8C00);
+}
+
+.flying-fish-inner img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    animation: fishWiggle 0.15s ease-in-out infinite alternate;
+}
+
+@keyframes fishWiggle {
+    0% { transform: rotate(-8deg); }
+    100% { transform: rotate(8deg); }
+}
+
+.fish-fire-trail {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,69,0,0.5) 50%, transparent 75%);
+    z-index: -1;
+    animation: fireTrailPulse 0.25s infinite alternate;
+}
+
+@keyframes fireTrailPulse {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    100% { transform: scale(1.3); opacity: 1; }
+}
+
+/* COMBO 3: TSUNAMI DE LA LAGUNE ÉBRIÉ */
+.lagune-tsunami-wave {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9987;
+    background: linear-gradient(90deg, 
+        rgba(0, 229, 255, 0) 0%, 
+        rgba(0, 229, 255, 0.65) 30%, 
+        rgba(255, 255, 255, 0.9) 50%, 
+        rgba(0, 229, 255, 0.65) 70%, 
+        rgba(0, 229, 255, 0) 100%);
+    box-shadow: 0 0 40px #00E5FF, 0 0 70px #00B0FF, inset 0 0 25px #FFFFFF;
+    backdrop-filter: blur(3px);
+    animation: tsunamiWaveRoll 1.1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes tsunamiWaveRoll {
+    0% { transform: translateX(-100%) scaleY(0.85); opacity: 0; }
+    30% { opacity: 0.95; }
+    70% { transform: translateX(20%) scaleY(1.05); opacity: 0.9; }
+    100% { transform: translateX(120%) scaleY(1); opacity: 0; }
+}
+
+.royal-fish-golden {
+    position: relative;
+    animation: royalFishAura 0.6s ease-in-out infinite alternate !important;
+    filter: drop-shadow(0 0 14px #FFD700) brightness(1.25) !important;
+}
+
+.royal-fish-golden::after {
+    content: "👑";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.1rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+    animation: crownFloat 0.8s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes crownFloat {
+    0% { transform: translateX(-50%) translateY(0); }
+    100% { transform: translateX(-50%) translateY(-5px); }
+}
+
+@keyframes royalFishAura {
+    0% { box-shadow: 0 0 10px #FFD700, inset 0 0 8px #FFD700; transform: scale(1); }
+    100% { box-shadow: 0 0 22px #00E5FF, inset 0 0 12px #FFFFFF; transform: scale(1.08); }
+}
+
+@media (max-width: 480px) {
+    .combo-banner-card {
+        padding: 16px 22px;
+        border-radius: 16px;
+    }
+    .combo-banner-title {
+        font-size: 1.35rem;
+    }
+    .combo-banner-subtitle {
+        font-size: 0.95rem;
+    }
+}

@@ -1248,34 +1248,144 @@ function createWrappedExplosion(tile) {
 }
 
 function showWouhEffect() {
-    const el = document.createElement('div');
-    el.innerText = "WOUH !";
-    el.style.position = 'fixed';
-    el.style.top = '50%';
-    el.style.left = '50%';
-    el.style.transform = 'translate(-50%, -50%) scale(0)';
-    el.style.fontSize = '4rem';
-    el.style.fontWeight = 'bold';
-    el.style.color = '#fff';
-    el.style.textShadow = '0 0 20px #FF4500';
-    el.style.zIndex = '3000';
-    el.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-    
-    document.body.appendChild(el);
-    
-    requestAnimationFrame(() => {
-        el.style.transform = 'translate(-50%, -50%) scale(1.5)';
-    });
-    
-    setTimeout(() => {
-        el.style.opacity = '0';
-        setTimeout(() => {
-            if (el.parentNode) el.parentNode.removeChild(el);
-        }, 300);
-    }, 800);
-    
-    triggerShake();
+    showSuperComboBanner("🔥 WOUH ! 🔥", "C'EST GÂTÉ DÉ ! 🍲✨", "#FF4500");
+    triggerShake("heavy");
     soundManager.playBonDabali();
+}
+
+function showSuperComboBanner(title, subtitle, color = "#FFD700") {
+    const existing = document.querySelector(".super-combo-banner-overlay");
+    if (existing) existing.remove();
+
+    const banner = document.createElement("div");
+    banner.className = "super-combo-banner-overlay";
+    banner.innerHTML = `
+        <div class="combo-banner-card" style="--banner-color: ${color};">
+            <div class="combo-banner-rays"></div>
+            <div class="combo-banner-title">${title}</div>
+            <div class="combo-banner-subtitle">${subtitle}</div>
+        </div>
+    `;
+    document.body.appendChild(banner);
+
+    setTimeout(() => {
+        banner.classList.add("banner-exit");
+        setTimeout(() => banner.remove(), 380);
+    }, 1800);
+}
+
+function showFeuDuMaquisCross(centerR, centerC) {
+    if (!gridEl) return;
+    const tileSize = cachedTileSize || 40;
+    const gap = cachedGap || 4;
+    const rect = gridEl.getBoundingClientRect();
+
+    // 3 rows fiery beam
+    for (let dr = -1; dr <= 1; dr++) {
+        const r = centerR + dr;
+        if (r >= 0 && r < GRID_SIZE) {
+            const beam = document.createElement("div");
+            beam.className = "feu-maquis-beam feu-beam-row";
+            const top = rect.top + 8 + (r * (tileSize + gap));
+            beam.style.top = `${top}px`;
+            beam.style.left = `${rect.left - 20}px`;
+            beam.style.width = `${rect.width + 40}px`;
+            beam.style.height = `${tileSize + 4}px`;
+            document.body.appendChild(beam);
+            setTimeout(() => beam.remove(), 550);
+        }
+    }
+
+    // 3 cols fiery beam
+    for (let dc = -1; dc <= 1; dc++) {
+        const c = centerC + dc;
+        if (c >= 0 && c < GRID_SIZE) {
+            const beam = document.createElement("div");
+            beam.className = "feu-maquis-beam feu-beam-col";
+            const left = rect.left + 8 + (c * (tileSize + gap));
+            beam.style.left = `${left}px`;
+            beam.style.top = `${rect.top - 20}px`;
+            beam.style.width = `${tileSize + 4}px`;
+            beam.style.height = `${rect.height + 40}px`;
+            document.body.appendChild(beam);
+            setTimeout(() => beam.remove(), 550);
+        }
+    }
+
+    // Spawn 16 fiery braise sparks
+    const centerTile = grid[centerR] && grid[centerR][centerC];
+    if (centerTile && centerTile.el) {
+        const cRect = centerTile.el.getBoundingClientRect();
+        const cx = cRect.left + cRect.width / 2;
+        const cy = cRect.top + cRect.height / 2;
+        for (let i = 0; i < 16; i++) {
+            const spark = document.createElement("div");
+            spark.className = "maquis-braise-spark";
+            spark.style.left = `${cx}px`;
+            spark.style.top = `${cy}px`;
+            const angle = (i / 16) * 2 * Math.PI + (Math.random() - 0.5) * 0.3;
+            const dist = 60 + Math.random() * 90;
+            spark.style.setProperty("--tx", `${Math.cos(angle) * dist}px`);
+            spark.style.setProperty("--ty", `${Math.sin(angle) * dist}px`);
+            document.body.appendChild(spark);
+            setTimeout(() => spark.remove(), 600);
+        }
+    }
+}
+
+function createFlyingGarbaFish(startX, startY, targetTile) {
+    if (!targetTile || !targetTile.el) return;
+    const targetRect = targetTile.el.getBoundingClientRect();
+    const targetX = targetRect.left + targetRect.width / 2;
+    const targetY = targetRect.top + targetRect.height / 2;
+
+    const fish = document.createElement("div");
+    fish.className = "flying-garba-fish";
+    fish.style.left = `${startX - 22}px`;
+    fish.style.top = `${startY - 22}px`;
+    fish.innerHTML = `
+        <div class="flying-fish-inner">
+            <img src="assets/poisson.png" width="44" height="44" alt="Poisson Volant">
+            <div class="fish-fire-trail"></div>
+        </div>
+    `;
+    document.body.appendChild(fish);
+
+    const midX = (startX + targetX) / 2 + (Math.random() - 0.5) * 100;
+    const midY = Math.min(startY, targetY) - 90 - Math.random() * 70;
+
+    const animation = fish.animate([
+        { transform: `translate3d(0, 0, 0) scale(0.6) rotate(0deg)`, opacity: 0.9 },
+        { transform: `translate3d(${midX - startX}px, ${midY - startY}px, 0) scale(1.3) rotate(-20deg)`, opacity: 1, offset: 0.5 },
+        { transform: `translate3d(${targetX - startX}px, ${targetY - startY}px, 0) scale(1) rotate(45deg)`, opacity: 1 }
+    ], {
+        duration: 520,
+        easing: "cubic-bezier(0.2, 0.8, 0.4, 1)"
+    });
+
+    animation.onfinish = () => {
+        fish.remove();
+        createCartoonShockwave(targetX, targetY);
+        soundManager.playImpact();
+        vibrate([50]);
+        if (targetTile.el) {
+            targetTile.el.classList.add("pop-anim");
+        }
+    };
+}
+
+function createLaguneTsunamiWave() {
+    if (!gridEl) return;
+    const rect = gridEl.getBoundingClientRect();
+    const wave = document.createElement("div");
+    wave.className = "lagune-tsunami-wave";
+    wave.style.top = `${rect.top - 10}px`;
+    wave.style.left = `${rect.left}px`;
+    wave.style.width = `${rect.width}px`;
+    wave.style.height = `${rect.height + 20}px`;
+    document.body.appendChild(wave);
+
+    setTimeout(() => wave.remove(), 1150);
 }
 
 function getParticleColor(typeId) {
@@ -2167,6 +2277,107 @@ const soundManager = {
     },
     playImpact: () => {
         soundManager.playTone(150, "square", 0.1);
+    },
+    playFeuDuMaquis: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const now = soundCtx.currentTime;
+        const osc = soundCtx.createOscillator();
+        const gain = soundCtx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(280, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.6);
+        gain.gain.setValueAtTime(0.26 * soundVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc.connect(gain);
+        gain.connect(soundCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.6);
+
+        try {
+            const bufferSize = Math.floor(soundCtx.sampleRate * 0.45);
+            const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (Math.random() < 0.2 ? 1 : 0.25);
+            }
+            const noise = soundCtx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = soundCtx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 2400;
+            filter.Q.value = 3.0;
+            const noiseGain = soundCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.2 * soundVolume, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(soundCtx.destination);
+            noise.start(now);
+        } catch(e) {}
+
+        soundManager.playExplosion();
+    },
+    playSachetSurprise: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const chimeNotes = [784, 988, 1175, 1397, 1568, 1976, 2349];
+        chimeNotes.forEach((freq, idx) => {
+            setTimeout(() => {
+                soundManager.playTone(freq, "triangle", 0.18);
+            }, idx * 45);
+        });
+    },
+    playTsunamiWave: () => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (!ensureAudioContextReady()) return;
+        const now = soundCtx.currentTime;
+        try {
+            const bufferSize = Math.floor(soundCtx.sampleRate * 0.85);
+            const buffer = soundCtx.createBuffer(1, bufferSize, soundCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1);
+            }
+            const noise = soundCtx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = soundCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.setValueAtTime(250, now);
+            filter.frequency.linearRampToValueAtTime(1400, now + 0.35);
+            filter.frequency.exponentialRampToValueAtTime(180, now + 0.85);
+            
+            const gain = soundCtx.createGain();
+            gain.gain.setValueAtTime(0.05 * soundVolume, now);
+            gain.gain.linearRampToValueAtTime(0.28 * soundVolume, now + 0.35);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(soundCtx.destination);
+            noise.start(now);
+        } catch(e) {}
+
+        const fanfare = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        fanfare.forEach((f, i) => {
+            setTimeout(() => soundManager.playTone(f, "sawtooth", 0.35), 260 + i * 50);
+        });
+    },
+    speakVoice: (phrase) => {
+        if (!isSoundOn || soundVolume <= 0) return;
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            try {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(phrase);
+                utter.lang = "fr-FR";
+                utter.rate = 1.15;
+                utter.pitch = 1.25;
+                utter.volume = Math.min(1.0, soundVolume * 1.3);
+                window.speechSynthesis.speak(utter);
+            } catch(e) {
+                console.warn("speechSynthesis error:", e);
+            }
+        }
     }
 };
 
@@ -3464,7 +3675,17 @@ async function showHint() {
 function checkSwapForMatch(r1, c1, r2, c2) {
     const t1 = grid[r1][c1];
     const t2 = grid[r2][c2];
-    if (!t1 || !t2 || isObstacleId(t1.type.id) || isObstacleId(t2.type.id)) return false;
+    if (!t1 || !t2) return false;
+    
+    // Check Sachet Combos: Sachet + Special or Sachet + Sachet is a valid move!
+    const isT1S = t1.type && t1.type.id === 'sachet';
+    const isT2S = t2.type && t2.type.id === 'sachet';
+    if ((isT1S && (isSpecialTile(t2) || isColorBombTile(t2) || isT2S)) ||
+        (isT2S && (isSpecialTile(t1) || isColorBombTile(t1) || isT1S))) {
+        return true;
+    }
+
+    if (isObstacleId(t1.type.id) || isObstacleId(t2.type.id)) return false;
     
     // Any swap involving Color Bomb is ALWAYS a valid move!
     if (isColorBombTile(t1) || isColorBombTile(t2)) return true;
@@ -4380,6 +4601,8 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
     const isT2ColorBomb = isColorBombTile(tile2);
     const isT1Joker = tile1.type.id === "joker" || tile1.type.special === "joker";
     const isT2Joker = tile2.type.id === "joker" || tile2.type.special === "joker";
+    const isT1Sachet = tile1.type && tile1.type.id === "sachet";
+    const isT2Sachet = tile2.type && tile2.type.id === "sachet";
     
     // 0. JOKER ÉCLAIR UNIVERSEL (Foudroie toutes les pièces du type swipé !)
     if (isT1Joker || isT2Joker) {
@@ -4419,6 +4642,111 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
         await processMatches(Array.from(toDestroy));
         return true;
     }
+
+    // 0B. CADEAU DU GARBAMAN (Sachet Garba 🛍️ + Spécial ou Double Sachet 🛍️🛍️)
+    if (isT1Sachet || isT2Sachet) {
+        if (isT1Sachet && isT2Sachet) {
+            // DOUBLE SACHET GARBAMAN
+            await swapTilesVisual(tile1, tile2);
+            swapTilesData(tile1, tile2);
+            soundManager.playSachetSurprise();
+            soundManager.speakVoice("Hiiii gâté ! Prends pour toi !");
+            showSuperComboBanner("🛍️ CADEAU DU GARBAMAN ! 🛍️", "DOUBLE SACHET MAGIQUE ! ✨🐟", "#FF9E00");
+            triggerShake("mega");
+
+            const s1Rect = tile1.el.getBoundingClientRect();
+            const sX = s1Rect.left + s1Rect.width / 2;
+            const sY = s1Rect.top + s1Rect.height / 2;
+            createCartoonShockwave(sX, sY);
+
+            const targets = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const t = grid[r][c];
+                    if (t && isObstacleId(t.type.id) && t !== tile1 && t !== tile2) {
+                        targets.push(t);
+                    }
+                }
+            }
+            if (targets.length < 8) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const t = grid[r][c];
+                        if (t && t !== tile1 && t !== tile2 && !targets.includes(t)) {
+                            targets.push(t);
+                            if (targets.length >= 8) break;
+                        }
+                    }
+                    if (targets.length >= 8) break;
+                }
+            }
+
+            targets.forEach((tgt, idx) => {
+                setTimeout(() => {
+                    createFlyingGarbaFish(sX, sY, tgt);
+                }, idx * 75);
+            });
+
+            await new Promise(r => setTimeout(r, targets.length * 75 + 550));
+            const toDestroy = new Set([tile1, tile2, ...targets]);
+            const bonus = 5000;
+            score += bonus;
+            showFloatingScore(sX, sY - 30, `+${bonus} DOUBLE GARBAMAN ! 🛍️🐟`, "#FFD700");
+            await processMatches(Array.from(toDestroy));
+            return true;
+        } else if (isT1Special || isT2Special || isT1ColorBomb || isT2ColorBomb) {
+            // Sachet + Tuile Spéciale
+            const sachetTile = isT1Sachet ? tile1 : tile2;
+            const specialTile = sachetTile === tile1 ? tile2 : tile1;
+            await swapTilesVisual(tile1, tile2);
+            swapTilesData(tile1, tile2);
+            soundManager.playSachetSurprise();
+            soundManager.speakVoice("Hiiii gâté ! Prends pour toi !");
+            showSuperComboBanner("🛍️ CADEAU DU GARBAMAN ! 🛍️", "Y'A LE DOSSIER DEDANS ! ✨🐟", "#FF9E00");
+            triggerShake("heavy");
+
+            const sRect = sachetTile.el.getBoundingClientRect();
+            const sX = sRect.left + sRect.width / 2;
+            const sY = sRect.top + sRect.height / 2;
+            createCartoonShockwave(sX, sY);
+
+            const targets = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const t = grid[r][c];
+                    if (t && isObstacleId(t.type.id) && t !== sachetTile && t !== specialTile) {
+                        targets.push(t);
+                    }
+                }
+            }
+            if (targets.length < 6) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const t = grid[r][c];
+                        if (t && t !== sachetTile && t !== specialTile && !targets.includes(t)) {
+                            targets.push(t);
+                            if (targets.length >= 6) break;
+                        }
+                    }
+                    if (targets.length >= 6) break;
+                }
+            }
+
+            targets.forEach((tgt, idx) => {
+                setTimeout(() => {
+                    createFlyingGarbaFish(sX, sY, tgt);
+                }, idx * 80);
+            });
+
+            await new Promise(r => setTimeout(r, targets.length * 80 + 550));
+            const toDestroy = new Set([sachetTile, specialTile, ...targets]);
+            const bonus = 4000;
+            score += bonus;
+            showFloatingScore(sX, sY - 30, `+${bonus} CADEAU DU GARBAMAN ! 🛍️✨`, "#FFD700");
+            await processMatches(Array.from(toDestroy));
+            return true;
+        }
+    }
     
     if (!isT1Special && !isT2Special) return false;
     
@@ -4428,6 +4756,8 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
         swapTilesData(tile1, tile2);
         triggerShake("mega");
         soundManager.playColorBombMega();
+        soundManager.speakVoice("Abidjan est doux dé !");
+        showSuperComboBanner("👑 GRAND MÉNAGE D'ABIDJAN ! 👑", "TOUT EST PROPRE DÉ ! ✨🧹", "#FFD700");
         const rect = tile2.el.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
@@ -4485,6 +4815,8 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
             await new Promise(r => setTimeout(r, 300));
             triggerShake("mega");
             soundManager.playLaserShoot();
+            soundManager.speakVoice("C'est gâté !");
+            showSuperComboBanner("⚡ FESTIVAL DE GARBA ! ⚡", "C'EST EN FEU ! 🔥🍲", "#FFD700");
             
             const toDestroy = new Set([colorBomb, other]);
             targets.forEach(st => {
@@ -4560,9 +4892,55 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
             return true;
         }
         
-        // 2C. Color Bomb + Normal Ingredient
+        // 2C. Color Bomb + Normal Ingredient (ou Tsunami si Poisson !)
         if (!isObstacleId(other.type.id)) {
             const targetId = other.type.id;
+            
+            // COMBO 3: TSUNAMI DE LA LAGUNE ÉBRIÉ (Color Bomb + Poisson)
+            if (targetId === "poisson") {
+                soundManager.playTsunamiWave();
+                soundManager.speakVoice("Waaahou ! C'est trop doux !");
+                showSuperComboBanner("🌊 TSUNAMI DE LA LAGUNE ! 🌊", "ABIDJAN EST GÂTÉ ! 👑🐟", "#00E5FF");
+                createLaguneTsunamiWave();
+                triggerShake("mega");
+
+                const targets = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const t = grid[r][c];
+                        if (t && t.type.id === "poisson" && t !== colorBomb) targets.push(t);
+                    }
+                }
+
+                targets.forEach(t => {
+                    if (t.el) {
+                        t.el.classList.add("royal-fish-golden", "jump-anim");
+                    }
+                });
+
+                await new Promise(r => setTimeout(r, 450));
+
+                const toDestroy = new Set([colorBomb, other]);
+                targets.forEach(t => {
+                    toDestroy.add(t);
+                    if (t.el) {
+                        const tr = t.el.getBoundingClientRect();
+                        createCartoonShockwave(tr.left + tr.width / 2, tr.top + tr.height / 2);
+                    }
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (grid[t.r][c] && !isObstacleId(grid[t.r][c].type.id)) toDestroy.add(grid[t.r][c]);
+                    }
+                });
+
+                const bonus = toDestroy.size * 90 + 5000;
+                score += bonus;
+                showFloatingScore(cbX, cbY - 30, `+${bonus} TSUNAMI ÉBRIÉ ! 🌊👑`, "#00E5FF");
+                await new Promise(r => setTimeout(r, 320));
+                await processMatches(Array.from(toDestroy));
+                return true;
+            }
+
+            // Normal Color Bomb + Ingredient
             const targets = [];
             for (let r = 0; r < GRID_SIZE; r++) {
                 for (let c = 0; c < GRID_SIZE; c++) {
@@ -4616,17 +4994,17 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
         return true;
     }
     
-    // 4. Striped + Wrapped (Video 3 Combo: Giant 3-row x 3-col Triple Laser)
+    // 4. COMBO 1: « LE FEU DU MAQUIS ! » 🔥🍗 (Striped + Wrapped)
     if ((isStripedTile(tile1) && isWrappedTile(tile2)) || (isWrappedTile(tile1) && isStripedTile(tile2))) {
         await swapTilesVisual(tile1, tile2);
         swapTilesData(tile1, tile2);
         const center = tile2;
-        soundManager.playLaserShoot();
-        soundManager.playWrappedBomb();
-        triggerShake("heavy");
+        soundManager.playFeuDuMaquis();
+        soundManager.speakVoice("Wouuuh ! Ça chauffe dé !");
+        showSuperComboBanner("🔥 LE FEU DU MAQUIS ! 🔥", "C'EST BRAISÉ DÉ ! 🍗💥", "#FF4500");
+        triggerShake("mega");
         
-        showLaserBeam("row", center.r, 3);
-        showLaserBeam("col", center.c, 3);
+        showFeuDuMaquisCross(center.r, center.c);
         
         const toDestroy = new Set([tile1, tile2]);
         for (let dr = -1; dr <= 1; dr++) {
@@ -4646,9 +5024,9 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
             }
         }
         const rect = center.el.getBoundingClientRect();
-        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+2500 MÉGA RAYON TRIPLE ! 💥", "#FFD700");
-        score += 2500;
-        await new Promise(r => setTimeout(r, 280));
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+4000 LE FEU DU MAQUIS ! 🔥🍗", "#FF4500");
+        score += 4000;
+        await new Promise(r => setTimeout(r, 450));
         await processMatches(Array.from(toDestroy));
         return true;
     }
@@ -4660,6 +5038,8 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
         const center = tile2;
         createWrappedExplosion(center);
         soundManager.playWrappedBomb();
+        soundManager.speakVoice("Marmite explosive !");
+        showSuperComboBanner("💥 MÉGA DÉTONATION 5x5 ! 🍲", "DOUBLE MARMITE ROYALE ! 💥", "#FFD700");
         triggerShake("heavy");
         
         const toDestroy = new Set([tile1, tile2]);
@@ -4673,9 +5053,9 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
             }
         }
         const rect = center.el.getBoundingClientRect();
-        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+3000 MÉGA DÉTONATION 5x5 ! 🍲💥", "#FFD700");
-        score += 3000;
-        await new Promise(r => setTimeout(r, 280));
+        showFloatingScore(rect.left + rect.width / 2, rect.top - 25, "+3500 MÉGA DÉTONATION 5x5 ! 🍲💥", "#FFD700");
+        score += 3500;
+        await new Promise(r => setTimeout(r, 320));
         await processMatches(Array.from(toDestroy));
         return true;
     }
@@ -4686,7 +5066,12 @@ async function checkAndExecuteSuperCombo(tile1, tile2) {
 async function attemptSwap(tile1, tile2) {
     if (tile1 === tile2) return;
     if (!tile1 || !tile2) return;
-    if (isImmovable(tile1) || isImmovable(tile2)) {
+
+    // Sachet combos are allowed to be swapped directly!
+    const isSachetCombo = (tile1.type && tile1.type.id === "sachet" && (isSpecialTile(tile2) || isColorBombTile(tile2) || tile2.type.id === "joker" || tile2.type.special === "joker" || tile2.type.id === "sachet")) ||
+                          (tile2.type && tile2.type.id === "sachet" && (isSpecialTile(tile1) || isColorBombTile(tile1) || tile1.type.id === "joker" || tile1.type.special === "joker" || tile1.type.id === "sachet"));
+
+    if (!isSachetCombo && (isImmovable(tile1) || isImmovable(tile2))) {
         if (selectedTile) {
             selectedTile.el.classList.remove("selected");
             selectedTile = null;
