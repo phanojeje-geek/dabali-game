@@ -31,6 +31,26 @@
   ],
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.kev-in.site"
+        }
+      ],
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/((?!api|assets|admin).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.kev-in.site"
+        }
+      ],
+      "destination": "/admin/index.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin/index.html"
     },
