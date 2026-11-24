@@ -1,31 +1,32 @@
-const CACHE_NAME = 'dabali-v40';
+const CACHE_NAME = 'dabali-v43';
 const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './style.css',
-    './script.js',
-    './manifest.json',
-    './assets/icone_dabali.png',
-    './assets/splash.jpg',
-    './assets/maggi.png',
-    './assets/alloco.png',
-    './assets/bottle.png',
-    './assets/map_saga_panoramic.webp',
-    './assets/intro.mp4',
-    './assets/background_game.webp',
-    './assets/background_game.png',
-    './assets/icon.svg'
+    '/',
+    'index.html',
+    'style.css',
+    'script.js',
+    'manifest.json',
+    'assets/icone_dabali.png',
+    'assets/icone_dabali_192.png',
+    'assets/splash_chef.webp',
+    'assets/maggi.png',
+    'assets/alloco.png',
+    'assets/bottle.png',
+    'assets/map_saga_panoramic.webp',
+    'assets/intro.mp4',
+    'assets/background_game.webp',
+    'assets/background_game.png',
+    'assets/icon.svg'
 ];
 
 // Installation
 self.addEventListener('install', (event) => {
-    // Ne pas forcer l'activation immédiate pour permettre à l'utilisateur de choisir via la notif
+    self.skipWaiting();
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('Cache ouvert');
-                return cache.addAll(ASSETS_TO_CACHE);
-            })
+        caches.open(CACHE_NAME).then((cache) => {
+            return Promise.allSettled(
+                ASSETS_TO_CACHE.map((url) => cache.add(url).catch((err) => console.warn('Cache error:', url, err)))
+            );
+        })
     );
 });
 
@@ -40,7 +41,7 @@ self.addEventListener('activate', (event) => {
                     }
                 })
             );
-        }).then(() => self.clients.claim()) // Take control of all clients immediately
+        }).then(() => self.clients.claim())
     );
 });
 
@@ -55,16 +56,27 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
 
+    // Ignore non-http requests (extensions, etc.)
+    if (!request.url.startsWith('http')) return;
+
+    // Navigation (HTML pages)
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request.url, { cache: 'no-cache' })
+            fetch(request.url)
                 .then((response) => {
-                    const copy = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
+                    if (response && response.status === 200) {
+                        const copy = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put('/', copy.clone());
+                            cache.put('index.html', copy);
+                        });
+                    }
                     return response;
                 })
                 .catch(() => {
-                    return caches.match('./index.html');
+                    return caches.match('/')
+                        .then((res) => res || caches.match('index.html'))
+                        .then((res) => res || caches.match('./index.html'));
                 })
         );
         return;
@@ -74,8 +86,10 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request.url, { cache: 'no-cache' })
                 .then((response) => {
-                    const copy = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+                    if (response && response.status === 200) {
+                        const copy = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+                    }
                     return response;
                 })
                 .catch(() => caches.match(request))
@@ -84,12 +98,9 @@ self.addEventListener('fetch', (event) => {
     }
 
     event.respondWith(
-        caches.match(request)
-            .then((response) => {
-                if (response) {
-                    return response;
-                }
-                return fetch(request);
-            })
+        caches.match(request).then((response) => {
+            if (response) return response;
+            return fetch(request).catch(() => null);
+        })
     );
 });

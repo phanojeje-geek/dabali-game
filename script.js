@@ -2018,14 +2018,9 @@ const soundCtx = AudioContextClass ? new AudioContextClass() : null;
 function ensureAudioContextReady() {
     if (!soundCtx) return false;
     if (soundCtx.state === "suspended") {
-        if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
-            return false;
-        }
         try {
             soundCtx.resume().catch(() => {});
-        } catch(e) {
-            return false;
-        }
+        } catch(e) {}
     }
     return true;
 }
@@ -6314,8 +6309,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (soundCtx && soundCtx.state === 'suspended') {
             soundCtx.resume().catch(() => {});
         }
+        if (introMusicAudio && introMusicAudio.paused) {
+            introMusicAudio.play().catch(() => {});
+        }
     };
     document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
     document.addEventListener('keydown', unlockAudio, { once: true });
 
     // Start intro tribal drums music immediately
