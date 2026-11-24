@@ -567,15 +567,18 @@ let allFeedbacks = [];
 let currentFbFilter = 'all';
 
 function initFeedbacksTab() {
-    // Restore saved Supabase anon key
-    const savedKey = localStorage.getItem('dabali_supabase_anon_key');
+    let savedKey = localStorage.getItem('dabali_supabase_anon_key');
+    if (savedKey && savedKey.startsWith('sb_publishable')) {
+        savedKey = '';
+        localStorage.removeItem('dabali_supabase_anon_key');
+    }
     const keyInput = document.getElementById('supabase-anon-key-input');
-    if (savedKey && keyInput) {
+    if (keyInput && savedKey) {
         keyInput.value = savedKey;
         const badge = document.getElementById('supabase-status-badge');
         if (badge) {
             badge.className = 'badge badge-green';
-            badge.textContent = 'Clé Supabase Configurée ✅';
+            badge.textContent = 'Connecté à Supabase ✅';
         }
     }
 
@@ -821,8 +824,16 @@ async function testSupabaseConnection() {
         return;
     }
 
+    let projectRef = "kreuuysqpbihdshlwafx";
     try {
-        const res = await fetch("https://owiwogingjiumfiyawbk.supabase.co/rest/v1/feedbacks?limit=1", {
+        if (key.includes('.')) {
+            const payload = JSON.parse(atob(key.split('.')[1]));
+            if (payload && payload.ref) projectRef = payload.ref;
+        }
+    } catch (_) {}
+
+    try {
+        const res = await fetch(`https://${projectRef}.supabase.co/rest/v1/feedbacks?limit=1`, {
             headers: {
                 "apikey": key,
                 "Authorization": `Bearer ${key}`

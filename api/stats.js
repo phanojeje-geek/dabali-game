@@ -1,7 +1,7 @@
 // Vercel Serverless Function: /api/stats
 // Aggregates dashboard analytics: live online players, rating average, total feedback count
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://owiwogingjiumfiyawbk.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://kreuuysqpbihdshlwafx.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export default async function handler(req, res) {
