@@ -19,10 +19,11 @@
                 <p>Espace de gestion officiel du jeu</p>
             </div>
             <form id="login-form">
+                <input type="text" name="username" value="admin" autocomplete="username" style="display:none;" aria-hidden="true">
                 <div class="form-group">
                     <label for="admin-pin"><i class="fas fa-lock"></i> Clé d'accès administrateur</label>
                     <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center;">
-                        <input type="password" id="admin-pin" value="dabali2026admin" placeholder="Entrez la clé secrète..." required autocomplete="current-password" style="width: 100%; padding-right: 44px;">
+                        <input type="password" id="admin-pin" name="password" value="dabali2026admin" placeholder="Entrez la clé secrète..." required autocomplete="current-password" style="width: 100%; padding-right: 44px;">
                         <button type="button" id="toggle-pwd-btn" style="position: absolute; right: 12px; background: transparent; border: none; color: #FFD700; cursor: pointer; font-size: 1.15rem;" title="Afficher/Masquer le mot de passe">
                             <i class="fas fa-eye" id="toggle-pwd-icon"></i>
                         </button>
@@ -290,8 +291,8 @@
                     <div class="card-body">
                         <form id="announcement-form">
                             <div class="form-group toggle-group">
-                                <label for="announcement-toggle">Activer l'annonce en jeu</label>
-                                <label class="switch">
+                                <span class="toggle-title">Activer l'annonce en jeu</span>
+                                <label class="switch" for="announcement-toggle">
                                     <input type="checkbox" id="announcement-toggle" checked>
                                     <span class="slider round"></span>
                                 </label>
@@ -333,7 +334,7 @@
                                 <small>Cette clé protège l'accès à ce dashboard et autorise les mises à jour.</small>
                             </div>
                             <div class="form-group">
-                                <label>URL de l'API de Synchronisation</label>
+                                <label for="api-url-input">URL de l'API de Synchronisation</label>
                                 <input type="text" id="api-url-input" value="/api/game-config" readonly>
                             </div>
                             <div class="buttons-row">
@@ -389,8 +390,8 @@
                     </div>
                 </div>
                 <div class="form-group toggle-group">
-                    <label for="ad-enabled">Activer la campagne publicitaire</label>
-                    <label class="switch">
+                    <span class="toggle-title">Activer la campagne publicitaire</span>
+                    <label class="switch" for="ad-enabled">
                         <input type="checkbox" id="ad-enabled" checked>
                         <span class="slider round"></span>
                     </label>
@@ -427,7 +428,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Objectifs à récolter</label>
+                    <span class="toggle-title">Objectifs à récolter</span>
                     <div class="goals-selection-grid">
                         <div class="goal-input-item">
                             <span>🍚 Attiéké</span>
